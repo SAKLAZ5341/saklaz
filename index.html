@@ -308,6 +308,8 @@ let ui = {
   confirmRow:null, // "movement:id" veya "reminder:id"
   movFormType:'giden',
   addingMultiMaterial:null, // job id ya da null
+  editingMovementId:null,
+  editingReminderId:null,
 };
 
 /* Çoklu hammadde kalemi girişi için geçici durum */
@@ -321,6 +323,7 @@ function setTab(t) {
   ui.addingCompany=false; ui.editingCompany=false; ui.addingJob=false; ui.editingJob=false;
   ui.addingMovement=false; ui.addingReminderInJob=false; ui.addingMovementList=false; ui.addingReminderList=false;
   ui.confirmDeleteCompany=false; ui.confirmDeleteJob=false; ui.confirmRow=null; ui.addingMultiMaterial=null;
+  ui.editingMovementId=null; ui.editingReminderId=null;
   materialRows=[blankRow()]; materialFormDate=todayStr(); materialFormNote='';
   render();
 }
@@ -752,6 +755,7 @@ function submitMultiMaterial(jobId) {
 }
 
 function movementRow(m) {
+  if (ui.editingMovementId === m.id) return movementEditForm(m);
   const isGiden = m.type==='giden'; const tutar = (Number(m.quantity)||0)*(Number(m.unitPrice)||0);
   const rowKey = 'movement:'+m.id; const confirming = ui.confirmRow===rowKey;
   const j = jobById(m.jobId); const c = j ? companyById(j.companyId) : null;
@@ -770,15 +774,61 @@ function movementRow(m) {
       </div>
       <div class="mv-amount" style="color:${isGiden?'var(--amber)':'var(--green)'}">${money(tutar)}</div>
     </div>
-    <div style="display:flex;justify-content:flex-end;margin-top:6px">
+    <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:6px">
       ${confirming ? `<div style="display:flex;gap:8px">
         <button class="btn-link" style="color:var(--red)" onclick="deleteMovement('${m.id}')">Evet, sil</button>
         <button class="btn-link" onclick="ui.confirmRow=null;render()">Vazgeç</button></div>`
 
-      : `<button class="btn-link muted" style="font-size:11px" onclick="ui.confirmRow='${rowKey}';render()">Sil</button>`}
+      : `<button class="btn-link muted" style="font-size:11px" onclick="ui.editingMovementId='${m.id}';render()">Düzenle</button>
+      <button class="btn-link muted" style="font-size:11px" onclick="ui.confirmRow='${rowKey}';render()">Sil</button>`}
     </div></div>`;
 }
 function deleteMovement(id) { movements = movements.filter(m=>m.id!==id); persist(); ui.confirmRow=null; render(); toast('Hareket silindi'); }
+
+function movementEditForm(m) {
+  const isGiden = m.type === 'giden';
+  const giderFields = `
+    <div class="field"><label>Malzeme İsmi</label><input id="me_materialName" value="${esc(m.materialName||m.itemName)}"></div>
+    <div class="field"><label>Malzeme Cinsi</label><input id="me_materialType" value="${esc(m.materialType)}"></div>
+    <div class="field"><label>Kalite</label><input id="me_quality" value="${esc(m.quality)}"></div>
+    <div class="field"><label>Açıklama</label><textarea id="me_description" rows="2">${esc(m.description)}</textarea></div>`;
+  const gelenFields = `<div class="field"><label>Ürün Adı</label><input id="me_itemName" value="${esc(m.itemName)}"></div>`;
+  return `<div class="card" style="border-color:var(--blue)">
+    <div class="small muted" style="margin-bottom:8px;font-weight:600">Hareketi Düzenle — ${isGiden?'Giden (Hammadde)':'Gelen (Ürün/Fason)'}</div>
+    ${isGiden ? giderFields : gelenFields}
+    <div class="field"><label>Miktar</label><input id="me_quantity" type="number" step="0.01" value="${esc(m.quantity)}"></div>
+    <div class="field"><label>Birim</label><input id="me_unit" value="${esc(m.unit)}"></div>
+    <div class="field"><label>Birim Fiyat (₺)</label><input id="me_unitPrice" type="number" step="0.01" value="${esc(m.unitPrice)}"></div>
+    <div class="field"><label>Tarih</label><input id="me_date" type="date" value="${esc(m.date)}"></div>
+    <div class="field"><label>Not</label><textarea id="me_note" rows="2">${esc(m.note)}</textarea></div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="submitMovementEdit('${m.id}')">Kaydet</button>
+      <button class="btn-secondary" onclick="ui.editingMovementId=null;render()">Vazgeç</button>
+    </div></div>`;
+}
+function submitMovementEdit(id) {
+  const m = movements.find(x => x.id === id); if (!m) return;
+  const quantity = document.getElementById('me_quantity').value;
+  if (!quantity) return;
+  m.quantity = quantity;
+  m.unit = document.getElementById('me_unit').value;
+  m.unitPrice = document.getElementById('me_unitPrice').value;
+  m.date = document.getElementById('me_date').value;
+  m.note = document.getElementById('me_note').value;
+  if (m.type === 'giden') {
+    const materialName = document.getElementById('me_materialName').value.trim();
+    if (!materialName) return;
+    m.itemName = materialName; m.materialName = materialName;
+    m.materialType = document.getElementById('me_materialType').value;
+    m.quality = document.getElementById('me_quality').value;
+    m.description = document.getElementById('me_description').value;
+  } else {
+    const itemName = document.getElementById('me_itemName').value.trim();
+    if (!itemName) return;
+    m.itemName = itemName;
+  }
+  persist(); ui.editingMovementId = null; render(); toast('Hareket güncellendi');
+}
 
 function renderMovementsList() {
   let filtered = [...movements].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -832,6 +882,7 @@ function submitReminderForm(defaultJobId) {
 function cancelReminderForm() { ui.addingReminderInJob=false; ui.addingReminderList=false; render(); }
 
 function reminderRow(r) {
+  if (ui.editingReminderId === r.id) return reminderEditForm(r);
   const st = reminderState(r);
   const color = st==='done'?'var(--muted)':st==='overdue'?'var(--red)':st==='today'?'var(--amber)':'var(--blue)';
   const label = st==='overdue'?'Gecikti':st==='today'?'Bugün':st==='done'?'Tamamlandı':'Yaklaşıyor';
@@ -847,15 +898,40 @@ function reminderRow(r) {
         ${r.note?`<div class="small muted" style="margin-top:2px">${esc(r.note)}</div>`:''}
       </div>
     </div>
-    <div style="display:flex;justify-content:flex-end;margin-top:6px">
+    <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:6px">
       ${confirming ? `<div style="display:flex;gap:8px">
         <button class="btn-link" style="color:var(--red)" onclick="deleteReminder('${r.id}')">Evet, sil</button>
         <button class="btn-link" onclick="ui.confirmRow=null;render()">Vazgeç</button></div>`
-      : `<button class="btn-link muted" style="font-size:11px" onclick="ui.confirmRow='${rowKey}';render()">Sil</button>`}
+      : `<button class="btn-link muted" style="font-size:11px" onclick="ui.editingReminderId='${r.id}';render()">Düzenle</button>
+      <button class="btn-link muted" style="font-size:11px" onclick="ui.confirmRow='${rowKey}';render()">Sil</button>`}
     </div></div>`;
 }
 function toggleReminder(id) { const r = reminders.find(x=>x.id===id); r.done = !r.done; persist(); render(); }
 function deleteReminder(id) { reminders = reminders.filter(r=>r.id!==id); persist(); ui.confirmRow=null; render(); toast('Hatırlatıcı silindi'); }
+
+function reminderEditForm(r) {
+  const jobOpts = jobs.map(j => `<option value="${j.id}" ${r.jobId===j.id?'selected':''}>${esc(jobLabel(j))} (${esc(companyById(j.companyId)?.name||'?')})</option>`).join('');
+  return `<div class="card" style="border-color:var(--blue)">
+    <div class="small muted" style="margin-bottom:8px;font-weight:600">Hatırlatıcıyı Düzenle</div>
+    <div class="field"><label>Başlık</label><input id="re_title" value="${esc(r.title)}"></div>
+    <div class="field"><label>Tarih</label><input id="re_date" type="date" value="${esc(r.date)}"></div>
+    <div class="field"><label>İşle İlişkilendir (opsiyonel)</label><select id="re_jobId"><option value="">Yok</option>${jobOpts}</select></div>
+    <div class="field"><label>Not</label><textarea id="re_note" rows="2">${esc(r.note)}</textarea></div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="submitReminderEdit('${r.id}')">Kaydet</button>
+      <button class="btn-secondary" onclick="ui.editingReminderId=null;render()">Vazgeç</button>
+    </div></div>`;
+}
+function submitReminderEdit(id) {
+  const r = reminders.find(x => x.id === id); if (!r) return;
+  const title = document.getElementById('re_title').value.trim();
+  if (!title) return;
+  r.title = title;
+  r.date = document.getElementById('re_date').value;
+  r.jobId = document.getElementById('re_jobId').value || null;
+  r.note = document.getElementById('re_note').value;
+  persist(); ui.editingReminderId = null; render(); toast('Hatırlatıcı güncellendi');
+}
 
 function renderRemindersList() {
   let filtered = [...reminders].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
