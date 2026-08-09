@@ -106,17 +106,17 @@
   @media (min-width: 861px) { #toast { bottom:24px; } }
   #loginScreen { height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:24px; background:var(--paper); }
   #loginScreen .box { width:100%; max-width:340px; }
-  #loginScreen .brand { text-align:center; margin-bottom:22px; }
-  #loginScreen .brand .mark { width:44px; height:44px; border-radius:10px; background:var(--blue); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:16px; margin:0 auto 12px; }
-  #loginScreen .brand .name { font-size:19px; font-weight:700; }
-  #loginScreen .brand .sub { font-size:12px; color:var(--muted); margin-top:2px; }
+  #loginScreen .brand, #roleScreen .brand { text-align:center; margin-bottom:22px; }
+  #loginScreen .brand .mark, #roleScreen .brand .mark { width:44px; height:44px; border-radius:10px; background:var(--blue); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:16px; margin:0 auto 12px; }
+  #loginScreen .brand .name, #roleScreen .brand .name { font-size:19px; font-weight:700; }
+  #loginScreen .brand .sub, #roleScreen .brand .sub { font-size:12px; color:var(--muted); margin-top:2px; }
   #loginError { color:var(--red); font-size:12px; margin-top:8px; min-height:16px; }
   body.viewer-mode .admin-only { display:none !important; }
   .role-badge { font-size:10px; padding:2px 8px; border-radius:999px; font-weight:600; display:inline-block; }
 </style>
 </head>
 <body>
-<div id="roleScreen" style="display:none; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:24px; background:var(--paper);">
+<div id="roleScreen" style="display:none; height:100vh; flex-direction:column; justify-content:center; align-items:center; padding:24px; background:var(--paper);">
   <div class="box" style="width:100%; max-width:360px;">
     <div class="brand">
       <div class="mark">FT</div>
