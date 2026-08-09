@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Fason Takip</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --ink:#1B1E24; --ink-soft:#262B33; --paper:#F4F3EF; --card:#FFFFFF; --blue:#2E5F8A; --blue-dark:#1F435F;
+    --amber:#C98A3E; --green:#4B7B5A; --red:#B5544A; --line:#E3E0D6; --line-soft:#EDEBE3; --muted:#87816F;
+    --sidebar-w:236px;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, "Segoe UI", system-ui, sans-serif; background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased; }
+  #shell { display:flex; height:100vh; overflow:hidden; }
+
+  /* ---- Sidebar (masaüstü) ---- */
+  #sidebar { width:var(--sidebar-w); flex-shrink:0; background:var(--ink); display:flex; flex-direction:column; }
+  #sidebar .brand { padding:22px 20px 18px; border-bottom:1px solid rgba(255,255,255,.08); }
+  #sidebar .brand .mark { width:34px; height:34px; border-radius:8px; background:var(--blue); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:14px; letter-spacing:.02em; }
+  #sidebar .brand .name { color:#fff; font-size:15px; font-weight:600; margin-top:12px; }
+  #sidebar .brand .sub { color:#8B93A0; font-size:11px; margin-top:2px; letter-spacing:.03em; }
+  #sidebarNav { flex:1; padding:14px 10px; overflow-y:auto; }
+  #sidebarNav .navitem { display:flex; align-items:center; gap:11px; width:100%; padding:10px 12px; border-radius:8px; background:none; border:none; color:#AEB4BF; font-size:13.5px; text-align:left; margin-bottom:2px; position:relative; }
+  #sidebarNav .navitem .ic { font-size:16px; width:20px; text-align:center; }
+  #sidebarNav .navitem.active { background:rgba(255,255,255,.08); color:#fff; font-weight:600; }
+  #sidebarNav .navitem .badge { margin-left:auto; background:var(--red); color:#fff; font-size:10px; border-radius:8px; padding:1px 6px; min-width:16px; text-align:center; }
+  #sidebar .foot { padding:14px 20px 18px; border-top:1px solid rgba(255,255,255,.08); }
+  #sidebar .foot button { background:none; border:none; color:#8B93A0; font-size:12px; padding:0; }
+
+  /* ---- Ana bölüm ---- */
+  #mainCol { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+  #topbar { background:var(--card); border-bottom:1px solid var(--line); padding:16px 28px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; }
+  #topbar .titlewrap .eyebrow { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  #topbar .titlewrap .title { font-size:20px; font-weight:700; margin-top:2px; letter-spacing:-.01em; }
+  #syncDot { width:7px; height:7px; border-radius:999px; background:#B9B2A0; display:inline-block; }
+  #syncDot.online { background:#4B8F5E; }
+  #syncDot.busy { background:var(--amber); }
+  #content { flex:1; overflow-y:auto; }
+  .content-inner { max-width:980px; margin:0 auto; padding:24px 28px 60px; }
+
+  /* ---- Alt gezinme (mobil) ---- */
+  #bottomnav { position:fixed; bottom:0; left:0; right:0; display:none; background:var(--card); border-top:1px solid var(--line); z-index:20; }
+  #bottomnav button { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:10px 0; background:none; border:none; font-size:10px; color:var(--muted); position:relative; }
+  #bottomnav button.active { color:var(--blue); font-weight:600; }
+  #bottomnav .icon { font-size:18px; }
+  #bottomnav .badge { position:absolute; top:2px; right:22%; background:var(--red); color:#fff; font-size:9px; border-radius:8px; padding:1px 4px; min-width:14px; text-align:center; }
+
+  @media (max-width: 860px) {
+    #sidebar { display:none; }
+    #topbar { padding:14px 16px; }
+    #topbar .titlewrap .title { font-size:17px; }
+    .content-inner { padding:0 16px 90px; max-width:none; }
+    .content-inner.pt { padding-top:16px; }
+    #bottomnav { display:flex; }
+    #content { padding-bottom:0; }
+  }
+
+  /* ---- Bileşenler ---- */
+  .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+  .toolbar .spacer { flex:1; }
+  .sect-label { font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:600; margin:22px 0 10px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; box-shadow:0 1px 2px rgba(20,20,20,.02); }
+  .row { display:flex; align-items:center; justify-content:space-between; }
+  .stack { display:flex; flex-direction:column; gap:8px; }
+  .btn-primary { background:var(--blue); color:#fff; border:none; border-radius:8px; padding:10px 16px; font-size:13.5px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .btn-primary:hover { background:var(--blue-dark); }
+  .btn-primary:disabled { opacity:.4; cursor:default; }
+  .btn-secondary { border:1px solid var(--line); background:var(--card); border-radius:8px; padding:9px 15px; font-size:13.5px; color:var(--ink); cursor:pointer; white-space:nowrap; }
+  .btn-secondary:hover { background:var(--line-soft); }
+  .btn-excel { border:1px solid #C7DCC9; background:#F1F8F1; color:#2E6B3A; border-radius:8px; padding:9px 15px; font-size:13px; font-weight:500; cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; gap:6px; }
+  .btn-excel:hover { background:#E5F2E6; }
+  .btn-danger { background:var(--red); color:#fff; border:none; border-radius:8px; padding:6px 12px; font-size:12px; cursor:pointer; }
+  .btn-link { background:none; border:none; color:var(--blue); font-size:13px; padding:0; cursor:pointer; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  @media (min-width: 861px) { .grid4-desktop { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; } }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .stat .lbl { font-size:11.5px; color:var(--muted); }
+  .stat .val { font-family: ui-monospace, "SF Mono", monospace; font-size:19px; font-weight:700; margin-top:6px; letter-spacing:-.01em; }
+  .badge-pill { font-size:11px; padding:3px 9px; border-radius:999px; font-weight:600; }
+  .field { margin-bottom:10px; }
+  .field label { font-size:11.5px; color:var(--muted); display:block; margin-bottom:4px; font-weight:500; }
+  .field input, .field select, .field textarea {
+    width:100%; border:1px solid var(--line); background:var(--paper); border-radius:7px; padding:9px 11px; font-size:14px; font-family:inherit;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { outline:2px solid var(--blue); outline-offset:-1px; background:#fff; }
+  .form-actions { display:flex; gap:8px; margin-top:4px; }
+  .form-actions .btn-primary { flex:1; }
+  .empty { text-align:center; color:var(--muted); font-size:13px; padding:32px 0; }
+  .link-back { display:flex; align-items:center; gap:4px; color:var(--blue); font-size:13px; background:none; border:none; margin-bottom:14px; cursor:pointer; padding:0; }
+  .chip-row { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .chip { font-size:12px; padding:6px 13px; border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--muted); cursor:pointer; }
+  .chip.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .mv-item { display:flex; gap:8px; align-items:flex-start; }
+  .mv-amount { font-family:ui-monospace, monospace; font-weight:700; font-size:14px; }
+  .checkbox-circle { width:20px; height:20px; border-radius:999px; border:1.5px solid var(--line); display:flex; align-items:center; justify-content:center; background:none; flex-shrink:0; cursor:pointer; }
+  .checkbox-circle.done { background:var(--green); border-color:var(--green); color:#fff; }
+  .muted { color:var(--muted); }
+  .small { font-size:11.5px; }
+  .filterbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  .filterbar select { border:1px solid var(--line); border-radius:7px; padding:8px 11px; font-size:13px; background:var(--card); }
+  #toast { position:fixed; bottom:70px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:9px 18px; border-radius:20px; font-size:13px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:50; }
+  #toast.show { opacity:1; }
+  @media (min-width: 861px) { #toast { bottom:24px; } }
+  #loginScreen { height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:24px; background:var(--paper); }
+  #loginScreen .box { width:100%; max-width:340px; }
+  #loginScreen .brand { text-align:center; margin-bottom:22px; }
+  #loginScreen .brand .mark { width:44px; height:44px; border-radius:10px; background:var(--blue); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:16px; margin:0 auto 12px; }
+  #loginScreen .brand .name { font-size:19px; font-weight:700; }
+  #loginScreen .brand .sub { font-size:12px; color:var(--muted); margin-top:2px; }
+  #loginError { color:var(--red); font-size:12px; margin-top:8px; min-height:16px; }
+</style>
+</head>
+<body>
+<div id="loginScreen">
+  <div class="box">
+    <div class="brand">
+      <div class="mark">FT</div>
+      <div class="name">Fason Takip</div>
+      <div class="sub">Tüm cihazlarda senkronize çalışır</div>
+    </div>
+    <div class="card">
+      <button class="btn-secondary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; padding:11px" onclick="doGoogleLogin()">
+        <svg width="17" height="17" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20.5H24v7h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l5.8 4.2C13.6 15.1 18.4 12 24 12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.5 5.1 29.5 3 24 3 16 3 9.1 7.6 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.4 0 10.3-2.1 14-5.5l-6.5-5.4C29.5 35.9 26.9 37 24 37c-5.3 0-9.7-3.4-11.3-8l-6.5 5c2.8 7.1 9.7 12 17.8 12z"/><path fill="#1976D2" d="M43.6 20.5H42V20.5H24v7h11.3c-.8 2.3-2.2 4.2-4 5.6l6.5 5.4C39.8 36.6 43 30.9 43 24c0-1.2-.1-2.3-.4-3.5z"/></svg>
+        Google ile Giriş Yap
+      </button>
+      <div style="display:flex; align-items:center; gap:10px; margin:16px 0"><div style="flex:1;height:1px;background:var(--line)"></div><span class="small muted">veya e-posta ile</span><div style="flex:1;height:1px;background:var(--line)"></div></div>
+      <div class="field"><label>E-posta</label><input id="login_email" type="email" autocomplete="username"></div>
+      <div class="field"><label>Şifre</label><input id="login_password" type="password" autocomplete="current-password"></div>
+      <div id="loginError"></div>
+      <div class="form-actions"><button class="btn-primary" style="flex:1" onclick="doLogin()">Giriş Yap</button></div>
+      <div style="text-align:center;margin-top:14px"><button class="btn-link" onclick="doSignup()">İlk kez mi giriyorsunuz? Hesap oluştur</button></div>
+    </div>
+    <div class="small muted" style="text-align:center;margin-top:16px">Tüm cihazlarınızda aynı yöntemle (Google veya e-posta/şifre) giriş yapın — veriler otomatik senkronize olur.</div>
+  </div>
+</div>
+
+<div id="shell" style="display:none">
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="mark">FT</div>
+      <div class="name">Fason Takip</div>
+      <div class="sub"><span id="syncDot"></span> Senkron · Bulutta Saklanır</div>
+    </div>
+    <nav id="sidebarNav"></nav>
+    <div class="foot"><button onclick="doLogout()">Çıkış Yap</button></div>
+  </aside>
+  <div id="mainCol">
+    <div id="topbar">
+      <div class="titlewrap">
+        <div class="eyebrow"><span id="syncDotTop"></span>Fason Takip</div>
+        <div class="title" id="topbarTitle">Özet</div>
+      </div>
+    </div>
+    <div id="content"></div>
+  </div>
+</div>
+<nav id="bottomnav"></nav>
+<input type="file" id="excelImportInput" accept=".xlsx,.xls" style="display:none" onchange="handleExcelImport(this)">
+<div id="toast"></div>
+
+<script>
+/* ---------- Depolama (Firebase Firestore ile senkron) ---------- */
+let companies = [];
+let jobs = [];
+let movements = [];
+let reminders = [];
+let currentUser = null;
+let unsubscribers = [];
+let loadedFlags = { companies:false, jobs:false, movements:false, reminders:false };
+
+function setSyncDot(state) {
+  ['syncDot','syncDotTop'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('online','busy');
+    if (state) el.classList.add(state);
+  });
+}
+function allLoaded() { return loadedFlags.companies && loadedFlags.jobs && loadedFlags.movements && loadedFlags.reminders; }
+
+function subscribeToData() {
+  unsubscribers.forEach(u => u()); unsubscribers = [];
+  loadedFlags = { companies:false, jobs:false, movements:false, reminders:false };
+  const uid_ = currentUser.uid;
+  const { db, doc, onSnapshot } = window.fb;
+  const map = { companies: v => companies = v, jobs: v => jobs = v, movements: v => movements = v, reminders: v => reminders = v };
+  Object.keys(map).forEach(key => {
+    const ref = doc(db, 'users', uid_, 'data', key);
+    const unsub = onSnapshot(ref, (snap) => {
+      map[key](snap.exists() && snap.data().items ? snap.data().items : []);
+      loadedFlags[key] = true;
+      setSyncDot(snap.metadata.hasPendingWrites ? 'busy' : 'online');
+      if (allLoaded()) render();
+    }, () => setSyncDot(''));
+    unsubscribers.push(unsub);
+  });
+}
+
+async function persist() {
+  if (!currentUser) return;
+  setSyncDot('busy');
+  const uid_ = currentUser.uid;
+  const { db, doc, setDoc } = window.fb;
+  try {
+    await Promise.all([
+      setDoc(doc(db, 'users', uid_, 'data', 'companies'), { items: companies }),
+      setDoc(doc(db, 'users', uid_, 'data', 'jobs'), { items: jobs }),
+      setDoc(doc(db, 'users', uid_, 'data', 'movements'), { items: movements }),
+      setDoc(doc(db, 'users', uid_, 'data', 'reminders'), { items: reminders }),
+    ]);
+    setSyncDot('online');
+  } catch (e) { console.error(e); setSyncDot(''); toast('Senkronizasyon hatası — internet bağlantınızı kontrol edin'); }
+}
+
+function doLogin() {
+  const email = document.getElementById('login_email').value.trim();
+  const password = document.getElementById('login_password').value;
+  const errEl = document.getElementById('loginError'); errEl.textContent = '';
+  if (!email || !password) { errEl.textContent = 'E-posta ve şifre gerekli.'; return; }
+  window.fb.signInWithEmailAndPassword(window.fb.auth, email, password).catch((e) => {
+    errEl.textContent = 'Giriş başarısız: ' + friendlyAuthError(e.code);
+  });
+}
+function doGoogleLogin() {
+  const errEl = document.getElementById('loginError'); if (errEl) errEl.textContent = '';
+  const provider = new window.fb.GoogleAuthProvider();
+  window.fb.signInWithRedirect(window.fb.auth, provider);
+}
+function doSignup() {
+  const email = document.getElementById('login_email').value.trim();
+  const password = document.getElementById('login_password').value;
+  const errEl = document.getElementById('loginError'); errEl.textContent = '';
+  if (!email || !password) { errEl.textContent = 'E-posta ve şifre gerekli.'; return; }
+  if (password.length < 6) { errEl.textContent = 'Şifre en az 6 karakter olmalı.'; return; }
+  window.fb.createUserWithEmailAndPassword(window.fb.auth, email, password).catch((e) => {
+    errEl.textContent = 'Hesap oluşturulamadı: ' + friendlyAuthError(e.code);
+  });
+}
+function doLogout() {
+  unsubscribers.forEach(u => u()); unsubscribers = [];
+  window.fb.signOut(window.fb.auth);
+}
+function friendlyAuthError(code) {
+  const map = {
+    'auth/invalid-email': 'geçersiz e-posta adresi', 'auth/user-not-found': 'kullanıcı bulunamadı',
+    'auth/wrong-password': 'şifre hatalı', 'auth/invalid-credential': 'e-posta veya şifre hatalı',
+    'auth/email-already-in-use': 'bu e-posta zaten kayıtlı, giriş yapmayı deneyin', 'auth/weak-password': 'şifre çok zayıf',
+  };
+  return map[code] || code || 'bilinmeyen hata';
+}
+function startApp() {
+  window.fb.onAuthStateChanged(window.fb.auth, (user) => {
+    if (user) {
+      currentUser = user;
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('shell').style.display = 'flex';
+      document.getElementById('content').innerHTML = '<div class="content-inner pt"><div class="empty">Veriler yükleniyor…</div></div>';
+      subscribeToData();
+    } else {
+      currentUser = null;
+      unsubscribers.forEach(u => u()); unsubscribers = [];
+      companies = []; jobs = []; movements = []; reminders = [];
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('shell').style.display = 'none';
+    }
+  });
+}
+window.startApp = startApp;
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function money(n) { const v = Number(n)||0; return v.toLocaleString('tr-TR',{style:'currency',currency:'TRY',maximumFractionDigits:2}); }
+function todayStr() { return new Date().toISOString().slice(0,10); }
+function fmtDate(d) { if(!d) return '-'; try { return new Date(d+'T00:00:00').toLocaleDateString('tr-TR',{day:'2-digit',month:'short',year:'numeric'}); } catch(e){ return d; } }
+function jobLabel(j) { if(!j) return '?'; if(j.projectCode && j.projectName) return j.projectCode+' · '+j.projectName; return j.projectName||j.projectCode||'İsimsiz İş'; }
+function companyById(id) { return companies.find(c=>c.id===id); }
+function jobById(id) { return jobs.find(j=>j.id===id); }
+function jobsForCompany(cid) { return jobs.filter(j=>j.companyId===cid); }
+function movementsForJob(jid) { return movements.filter(m=>m.jobId===jid).sort((a,b)=>(b.date||'').localeCompare(a.date||'')); }
+function remindersForJob(jid) { return reminders.filter(r=>r.jobId===jid); }
+function companyTotals(cid) {
+  const jIds = new Set(jobsForCompany(cid).map(j=>j.id));
+  let giden=0, gelen=0;
+  movements.forEach(m=>{ if(!jIds.has(m.jobId)) return; const t=(Number(m.quantity)||0)*(Number(m.unitPrice)||0); if(m.type==='giden') giden+=t; else gelen+=t; });
+  return { giden, gelen, bakiye: giden-gelen };
+}
+function reminderState(r) {
+  if (r.done) return 'done';
+  if (!r.date) return 'upcoming';
+  if (r.date < todayStr()) return 'overdue';
+  if (r.date === todayStr()) return 'today';
+  return 'upcoming';
+}
+function esc(s) { return (s===undefined||s===null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 1400); }
+
+/* ---------- Uygulama durumu ---------- */
+let ui = {
+  tab: 'dashboard', companyDetail: null, jobDetail: null,
+  addingCompany:false, editingCompany:false,
+  addingJob:false, jobsCompanyFilter:'',
+  editingJob:false, addingMovement:false, addingReminderInJob:false,
+  addingMovementList:false, movTypeFilter:'', movCompanyFilter:'',
+  addingReminderList:false, reminderFilter:'pending',
+  confirmDeleteCompany:false, confirmDeleteJob:false,
+  confirmRow:null, // "movement:id" veya "reminder:id"
+  movFormType:'giden',
+  addingMultiMaterial:null, // job id ya da null
+};
+
+/* Çoklu hammadde kalemi girişi için geçici durum */
+function blankRow() { return { materialName:'', materialType:'', quality:'', description:'', quantity:'', unit:'', unitPrice:'' }; }
+let materialRows = [blankRow()];
+let materialFormDate = todayStr();
+let materialFormNote = '';
+
+function setTab(t) {
+  ui.tab = t; ui.companyDetail = null; ui.jobDetail = null;
+  ui.addingCompany=false; ui.editingCompany=false; ui.addingJob=false; ui.editingJob=false;
+  ui.addingMovement=false; ui.addingReminderInJob=false; ui.addingMovementList=false; ui.addingReminderList=false;
+  ui.confirmDeleteCompany=false; ui.confirmDeleteJob=false; ui.confirmRow=null; ui.addingMultiMaterial=null;
+  materialRows=[blankRow()]; materialFormDate=todayStr(); materialFormNote='';
+  render();
+}
+
+/* ---------- Render ---------- */
+function render() {
+  const titles = { dashboard:'Özet', companies: ui.companyDetail ? 'Firma Detayı':'Firmalar', jobs: ui.jobDetail ? 'İş Detayı':'İşler', movements:'Hareketler', reminders:'Hatırlatıcılar' };
+  document.getElementById('topbarTitle').textContent = titles[ui.tab] || 'Fason Takip';
+
+  let html = '';
+  if (ui.tab === 'dashboard') html = renderDashboard();
+  else if (ui.tab === 'companies') html = ui.companyDetail ? renderCompanyDetail() : renderCompaniesList();
+  else if (ui.tab === 'jobs') html = ui.jobDetail ? renderJobDetail() : renderJobsList();
+  else if (ui.tab === 'movements') html = renderMovementsList();
+  else if (ui.tab === 'reminders') html = renderRemindersList();
+  document.getElementById('content').innerHTML = '<div class="content-inner pt">' + html + '</div>';
+
+  const alertCount = reminders.filter(r=>!r.done && (reminderState(r)==='overdue'||reminderState(r)==='today')).length;
+  document.getElementById('bottomnav').innerHTML = renderBottomNav(alertCount);
+  document.getElementById('sidebarNav').innerHTML = renderSidebarNav(alertCount);
+  attachContentEvents();
+}
+
+const NAV_ITEMS = [
+  {id:'dashboard', label:'Özet', icon:'🏠'},
+  {id:'companies', label:'Firmalar', icon:'🏢'},
+  {id:'jobs', label:'İşler', icon:'📋'},
+  {id:'movements', label:'Hareketler', icon:'↔️'},
+  {id:'reminders', label:'Hatırlatıcı', icon:'🔔'},
+];
+
+function renderSidebarNav(alertCount) {
+  return NAV_ITEMS.map(it => `
+    <button class="navitem ${ui.tab===it.id?'active':''}" onclick="setTab('${it.id}')">
+      <span class="ic">${it.icon}</span><span>${it.label}</span>
+      ${it.id==='reminders'&&alertCount>0?`<span class="badge">${alertCount>9?'9+':alertCount}</span>`:''}
+    </button>`).join('');
+}
+
+function renderBottomNav(alertCount) {
+  return NAV_ITEMS.map(it => `
+    <button class="${ui.tab===it.id?'active':''}" onclick="setTab('${it.id}')">
+      <span class="icon">${it.icon}${it.id==='reminders'&&alertCount>0?`<span class="badge">${alertCount>9?'9+':alertCount}</span>`:''}</span>
+      <span>${it.label}</span>
+    </button>`).join('');
+}
+
+/* ---------- DASHBOARD ---------- */
+function renderDashboard() {
+  const activeJobs = jobs.filter(j=>j.status!=='tamamlandi').length;
+  const now = new Date(); const ym = now.toISOString().slice(0,7);
+  const thisMonth = movements.filter(m=>(m.date||'').slice(0,7)===ym);
+  const gidenAy = thisMonth.filter(m=>m.type==='giden').reduce((s,m)=>s+(Number(m.quantity)||0)*(Number(m.unitPrice)||0),0);
+  const gelenAy = thisMonth.filter(m=>m.type==='gelen').reduce((s,m)=>s+(Number(m.quantity)||0)*(Number(m.unitPrice)||0),0);
+
+  let out = `<div class="grid2 grid4-desktop" style="padding-top:0">
+    <div class="stat"><div class="lbl">Toplam Firma</div><div class="val">${companies.length}</div></div>
+    <div class="stat"><div class="lbl">Aktif İş</div><div class="val" style="color:var(--blue)">${activeJobs}</div></div>
+    <div class="stat"><div class="lbl">Bu Ay Giden (Hammadde)</div><div class="val" style="color:var(--amber)">${money(gidenAy)}</div></div>
+    <div class="stat"><div class="lbl">Bu Ay Gelen (Fason)</div><div class="val" style="color:var(--green)">${money(gelenAy)}</div></div>
+  </div>`;
+
+  const upcoming = reminders.filter(r=>!r.done).sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(0,5);
+  if (upcoming.length) {
+    out += `<div class="sect-label">Yaklaşan Hatırlatıcılar</div><div class="px16 stack">`;
+    upcoming.forEach(r=>{
+      const st = reminderState(r); const color = st==='overdue'?'var(--red)':st==='today'?'var(--amber)':'var(--blue)';
+      out += `<button class="card" style="text-align:left;width:100%;display:flex;gap:10px;align-items:center" onclick="setTab('reminders')">
+        <span>🔔</span><div><div style="font-size:14px;font-weight:500">${esc(r.title)}</div>
+        <div class="small" style="color:${color}">${fmtDate(r.date)}${st==='overdue'?' · gecikti':st==='today'?' · bugün':''}</div></div>
+      </button>`;
+    });
+    out += `</div>`;
+  }
+
+  out += `<div class="sect-label">Firma Bazlı Bakiye</div>`;
+  if (companies.length===0) out += `<div class="px16"><div class="card empty">Henüz firma eklenmedi. "Firmalar" sekmesinden ekleyin.</div></div>`;
+  out += `<div class="px16 stack" style="padding-bottom:16px">`;
+  companies.forEach(c=>{
+    const t = companyTotals(c.id);
+    out += `<button class="card row" style="text-align:left;width:100%" onclick="openCompany('${c.id}')">
+      <div><div style="font-size:14px;font-weight:500">${esc(c.name)}</div>
+      <div class="small" style="display:flex;gap:10px;margin-top:4px;font-family:ui-monospace,monospace">
+        <span style="color:var(--amber)">↑ ${money(t.giden)}</span><span style="color:var(--green)">↓ ${money(t.gelen)}</span>
+      </div></div><span class="muted">›</span></button>`;
+  });
+  out += `</div>`;
+  return out;
+}
+function openCompany(id) { ui.tab='companies'; ui.companyDetail=id; render(); }
+function openJob(id) {
+  ui.tab='jobs'; ui.jobDetail=id; ui.addingMovement=false; ui.addingMultiMaterial=null;
+  ui.addingReminderInJob=false; ui.editingJob=false; ui.confirmDeleteJob=false;
+  materialRows=[blankRow()]; materialFormDate=todayStr(); materialFormNote='';
+  render();
+}
+
+/* ---------- FİRMALAR ---------- */
+function renderCompaniesList() {
+  let out = `<div class="toolbar">`;
+  out += `<button class="btn-primary" onclick="ui.addingCompany=true;render()">+ Yeni Firma</button>`;
+  out += `<button class="btn-excel" onclick="exportCompanies()">⬇ Excel'e Aktar</button>`;
+  out += `<button class="btn-excel" onclick="triggerImport('companies')">⬆ Excel'den Yükle</button>`;
+  out += `</div>`;
+  if (ui.addingCompany) out += companyForm();
+  out += `<div class="stack" style="margin-top:12px">`;
+  if (companies.length===0 && !ui.addingCompany) out += `<div class="empty">Henüz firma yok.</div>`;
+  companies.forEach(c=>{
+    const t = companyTotals(c.id); const jc = jobsForCompany(c.id).length;
+    out += `<button class="card row" style="text-align:left;width:100%" onclick="openCompany('${c.id}')">
+      <div><div style="font-size:14px;font-weight:500">${esc(c.name)}</div>
+      <div class="small muted" style="margin-top:2px">${jc} iş · Bakiye ${money(t.bakiye)}</div></div><span class="muted">›</span></button>`;
+  });
+  out += `</div>`;
+  return out;
+}
+function companyForm(existing) {
+  const c = existing || {};
+  return `<div class="card">
+    <div class="field"><label>Firma Adı</label><input id="f_name" value="${esc(c.name)}"></div>
+    <div class="field"><label>Yetkili / Telefon</label><input id="f_contact" value="${esc(c.contact)}"></div>
+    <div class="field"><label>Not</label><textarea id="f_note" rows="2">${esc(c.note)}</textarea></div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="submitCompanyForm(${existing?`'${existing.id}'`:'null'})">${existing?'Güncelle':'Firmayı Kaydet'}</button>
+      <button class="btn-secondary" onclick="cancelCompanyForm()">Vazgeç</button>
+    </div></div>`;
+}
+function submitCompanyForm(id) {
+  const name = document.getElementById('f_name').value.trim();
+  if (!name) return;
+  const data = { name, contact: document.getElementById('f_contact').value, note: document.getElementById('f_note').value };
+  if (id) { const c = companyById(id); Object.assign(c, data); }
+  else { companies.push({ id: uid(), ...data }); }
+  persist(); ui.addingCompany=false; ui.editingCompany=false; render(); toast('Kaydedildi');
+}
+function cancelCompanyForm() { ui.addingCompany=false; ui.editingCompany=false; render(); }
+
+function renderCompanyDetail() {
+  const c = companyById(ui.companyDetail); if (!c) return '<div class="px16 empty">Firma bulunamadı.</div>';
+  const t = companyTotals(c.id); const jList = jobsForCompany(c.id);
+  let out = `<button class="link-back" onclick="ui.companyDetail=null;render()">‹ Firmalar</button><div class="px16">`;
+  out += ui.editingCompany ? companyForm(c) : `<div class="card row" style="align-items:flex-start">
+    <div><div style="font-weight:600">${esc(c.name)}</div>
+    ${c.contact?`<div class="small muted" style="margin-top:2px">${esc(c.contact)}</div>`:''}
+    ${c.note?`<div class="small muted" style="margin-top:4px">${esc(c.note)}</div>`:''}</div>
+    <button class="btn-link" onclick="ui.editingCompany=true;render()">✎</button></div>`;
+
+  out += `<div class="grid3" style="margin-top:12px">
+    <div class="stat"><div class="lbl">Giden Hammadde</div><div class="val" style="color:var(--amber)">${money(t.giden)}</div></div>
+    <div class="stat"><div class="lbl">Gelen Fason</div><div class="val" style="color:var(--green)">${money(t.gelen)}</div></div>
+    <div class="stat"><div class="lbl">Bakiye</div><div class="val" style="color:${t.bakiye>=0?'var(--blue)':'var(--red)'}">${money(t.bakiye)}</div></div>
+  </div>`;
+
+  out += `<div class="sect-label" style="padding:0">İşler (${jList.length})</div><div class="stack">`;
+  if (jList.length===0) out += `<div class="small muted">Bu firmaya ait iş yok.</div>`;
+  jList.forEach(j=>{
+    out += `<button class="card row" style="text-align:left;width:100%" onclick="openJob('${j.id}')">
+      <div><div style="font-size:14px;font-weight:500">${esc(jobLabel(j))}</div>
+      <div class="small muted" style="margin-top:2px">${movementsForJob(j.id).length} hareket</div></div>
+      ${statusPill(j.status)}</button>`;
+  });
+  out += `</div>`;
+
+  out += `<div style="margin:20px 0">`;
+  if (!ui.confirmDeleteCompany) out += `<button class="btn-link" style="color:var(--red)" onclick="ui.confirmDeleteCompany=true;render()">🗑 Firmayı Sil</button>`;
+  else out += `<div class="small" style="color:var(--red)">Firma, işleri ve hareketleri silinecek. Emin misiniz?</div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn-danger" onclick="deleteCompany('${c.id}')">Evet, Sil</button>
+      <button class="btn-secondary" onclick="ui.confirmDeleteCompany=false;render()">Vazgeç</button>
+    </div>`;
+  out += `</div></div>`;
+  return out;
+}
+function deleteCompany(id) {
+  const jIds = new Set(jobsForCompany(id).map(j=>j.id));
+  jobs = jobs.filter(j=>j.companyId!==id);
+  movements = movements.filter(m=>!jIds.has(m.jobId));
+  reminders = reminders.filter(r=>!jIds.has(r.jobId));
+  companies = companies.filter(c=>c.id!==id);
+  persist(); ui.companyDetail=null; ui.confirmDeleteCompany=false; render(); toast('Firma silindi');
+}
+
+/* ---------- İŞLER ---------- */
+const STATUS = { bekliyor:{label:'Bekliyor',color:'var(--amber)'}, uretimde:{label:'Üretimde',color:'var(--blue)'}, tamamlandi:{label:'Tamamlandı',color:'var(--green)'} };
+function statusPill(s) { const st = STATUS[s]||{label:'-',color:'var(--muted)'}; return `<span class="badge-pill" style="background:color-mix(in srgb, ${st.color} 15%, white);color:${st.color}">${st.label}</span>`; }
+
+function renderJobsList() {
+  const filtered = ui.jobsCompanyFilter ? jobs.filter(j=>j.companyId===ui.jobsCompanyFilter) : jobs;
+  const sorted = [...filtered].sort((a,b)=>(b.createdDate||'').localeCompare(a.createdDate||''));
+  let out = `<div class="toolbar">`;
+  out += `<button class="btn-primary" ${companies.length===0?'disabled':''} onclick="ui.addingJob=true;render()">+ Yeni İş</button>`;
+  out += `<button class="btn-excel" onclick="exportJobs()">⬇ Excel'e Aktar</button>`;
+  out += `<button class="btn-excel" onclick="triggerImport('jobs')">⬆ Excel'den Yükle</button>`;
+  out += `</div>`;
+  if (companies.length===0) out += `<div class="small muted" style="margin-bottom:10px">İş eklemeden önce bir firma oluşturun.</div>`;
+  if (ui.addingJob) out += jobForm();
+  if (companies.length>0) {
+    out += `<div class="filterbar"><select onchange="ui.jobsCompanyFilter=this.value;render()">
+      <option value="">Tüm Firmalar</option>${companies.map(c=>`<option value="${c.id}" ${ui.jobsCompanyFilter===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>`;
+  }
+  out += `<div class="stack">`;
+  if (sorted.length===0 && !ui.addingJob) out += `<div class="empty">İş bulunamadı.</div>`;
+  sorted.forEach(j=>{
+    out += `<button class="card" style="text-align:left;width:100%" onclick="openJob('${j.id}')">
+      <div class="row"><div style="font-size:14px;font-weight:500">${esc(jobLabel(j))}</div>${statusPill(j.status)}</div>
+      <div class="small muted" style="margin-top:4px">${esc(companyById(j.companyId)?.name||'Bilinmeyen firma')} · ${fmtDate(j.createdDate)}${j.quantity?` · ${j.quantity} adet`:''}${j.fee?` · ${money(j.fee)}`:''}</div>
+    </button>`;
+  });
+  out += `</div>`;
+  return out;
+}
+function jobForm(existing) {
+  const j = existing || {};
+  const companyOpts = companies.map(c=>`<option value="${c.id}" ${j.companyId===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
+  return `<div class="card">
+    ${existing?'':`<div class="field"><label>Firma</label><select id="f_companyId"><option value="">Seçin…</option>${companyOpts}</select></div>`}
+    <div class="field"><label>Proje Kodu</label><input id="f_projectCode" value="${esc(j.projectCode)}"></div>
+    <div class="field"><label>Proje İsmi</label><input id="f_projectName" value="${esc(j.projectName)}"></div>
+    <div class="field"><label>Adet / Miktar</label><input id="f_quantity" type="number" step="0.01" value="${esc(j.quantity)}"></div>
+    <div class="field"><label>Ücret (₺)</label><input id="f_fee" type="number" step="0.01" value="${esc(j.fee)}"></div>
+    <div class="field"><label>Teknik Resim Referansı</label><input id="f_drawingRef" value="${esc(j.drawingRef)}"></div>
+    <div class="field"><label>Açıklama</label><textarea id="f_description" rows="2">${esc(j.description)}</textarea></div>
+    ${existing?'':`<div class="field"><label>Durum</label><select id="f_status">
+      <option value="bekliyor">Bekliyor</option><option value="uretimde">Üretimde</option><option value="tamamlandi">Tamamlandı</option></select></div>`}
+    <div class="form-actions">
+      <button class="btn-primary" onclick="submitJobForm(${existing?`'${existing.id}'`:'null'})">${existing?'Güncelle':'İşi Kaydet'}</button>
+      <button class="btn-secondary" onclick="cancelJobForm()">Vazgeç</button>
+    </div></div>`;
+}
+function submitJobForm(id) {
+  const projectName = document.getElementById('f_projectName').value.trim();
+  const companyId = id ? jobById(id).companyId : document.getElementById('f_companyId').value;
+  if (!projectName || !companyId) return;
+  const data = {
+    projectCode: document.getElementById('f_projectCode').value,
+    projectName, companyId,
+    quantity: document.getElementById('f_quantity').value,
+    fee: document.getElementById('f_fee').value,
+    drawingRef: document.getElementById('f_drawingRef').value,
+    description: document.getElementById('f_description').value,
+  };
+  if (id) { Object.assign(jobById(id), data); }
+  else { data.status = document.getElementById('f_status').value; data.createdDate = todayStr(); jobs.push({ id: uid(), ...data }); }
+  persist(); ui.addingJob=false; ui.editingJob=false; render(); toast('Kaydedildi');
+}
+function cancelJobForm() { ui.addingJob=false; ui.editingJob=false; render(); }
+
+function renderJobDetail() {
+  const j = jobById(ui.jobDetail); if (!j) return '<div class="px16 empty">İş bulunamadı.</div>';
+  const c = companyById(j.companyId);
+  const mList = movementsForJob(j.id); const rList = remindersForJob(j.id);
+  const giden = mList.filter(m=>m.type==='giden'), gelen = mList.filter(m=>m.type==='gelen');
+  const gidenTutar = giden.reduce((s,m)=>s+(Number(m.quantity)||0)*(Number(m.unitPrice)||0),0);
+  const gelenTutar = gelen.reduce((s,m)=>s+(Number(m.quantity)||0)*(Number(m.unitPrice)||0),0);
+
+  let out = `<button class="link-back" onclick="ui.jobDetail=null;render()">‹ İşler</button><div class="px16">`;
+  out += ui.editingJob ? jobForm(j) : `<div class="card">
+    <div class="row" style="align-items:flex-start">
+      <div><div style="font-weight:600;font-size:14px">${esc(jobLabel(j))}</div>
+      <div class="small muted" style="margin-top:2px">${esc(c?.name||'')}${j.quantity?` · ${j.quantity} adet`:''}${j.fee?` · ${money(j.fee)}`:''}</div>
+      ${j.drawingRef?`<div class="small" style="color:var(--blue-dark);margin-top:6px">📐 ${esc(j.drawingRef)}</div>`:''}
+      ${j.description?`<div class="small muted" style="margin-top:4px">${esc(j.description)}</div>`:''}</div>
+      <button class="btn-link" onclick="ui.editingJob=true;render()">✎</button></div>
+    <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+      ${Object.entries(STATUS).map(([k,s])=>`<button class="badge-pill" style="border:none;background:${j.status===k?s.color:'color-mix(in srgb, '+s.color+' 12%, white)'};color:${j.status===k?'#fff':s.color}" onclick="updateJobStatus('${j.id}','${k}')">${s.label}</button>`).join('')}
+    </div></div>`;
+
+  out += `<div class="grid3" style="margin-top:12px">
+    <div class="stat"><div class="lbl">Giden Hammadde</div><div class="val" style="color:var(--amber)">${money(gidenTutar)}</div></div>
+    <div class="stat"><div class="lbl">Gelen Fason</div><div class="val" style="color:var(--green)">${money(gelenTutar)}</div></div>
+    <div class="stat"><div class="lbl">İş Ücreti</div><div class="val" style="color:var(--blue)">${money(j.fee)}</div></div>
+  </div>`;
+
+  out += `<div style="margin-top:12px">`;
+  if (ui.addingMultiMaterial === j.id) {
+    out += renderMultiMaterialForm(j.id);
+  } else if (ui.addingMovement) {
+    out += movementForm(false, j.id, 'gelen');
+  } else {
+    out += `<div class="grid2">
+      <button class="btn-primary" onclick="openMultiMaterialForm('${j.id}')">+ Hammadde Gönder</button>
+      <button class="btn-secondary" style="width:100%" onclick="ui.addingMovement=true;render()">+ Gelen Ürün / Fason</button>
+    </div>`;
+  }
+  out += `</div>`;
+
+  out += `<div class="sect-label" style="padding:0">Hatırlatıcılar (${rList.length})</div><div class="stack">`;
+  rList.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(r=> out += reminderRow(r));
+  out += ui.addingReminderInJob ? reminderForm(j.id) : `<button class="btn-link" onclick="ui.addingReminderInJob=true;render()">+ Hatırlatıcı Ekle</button>`;
+  out += `</div>`;
+
+  out += `<div class="sect-label" style="padding:0">Hareketler (${mList.length})</div><div class="stack" style="padding-bottom:16px">`;
+  if (mList.length===0) out += `<div class="small muted">Henüz hareket yok.</div>`;
+  mList.forEach(m => out += movementRow(m));
+  out += `</div>`;
+
+  out += `<div style="margin:16px 0">`;
+  if (!ui.confirmDeleteJob) out += `<button class="btn-link" style="color:var(--red)" onclick="ui.confirmDeleteJob=true;render()">🗑 İşi Sil</button>`;
+  else out += `<div class="small" style="color:var(--red)">İş ve tüm hareketleri silinecek. Emin misiniz?</div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn-danger" onclick="deleteJob('${j.id}')">Evet, Sil</button>
+      <button class="btn-secondary" onclick="ui.confirmDeleteJob=false;render()">Vazgeç</button>
+    </div>`;
+  out += `</div></div>`;
+  return out;
+}
+function updateJobStatus(id, status) { jobById(id).status = status; persist(); render(); }
+function deleteJob(id) {
+  movements = movements.filter(m=>m.jobId!==id); reminders = reminders.filter(r=>r.jobId!==id);
+  jobs = jobs.filter(j=>j.id!==id); persist(); ui.jobDetail=null; ui.confirmDeleteJob=false; render(); toast('İş silindi');
+}
+
+/* ---------- HAREKETLER ---------- */
+function movementForm(showJobSelect, defaultJobId, forcedType) {
+  const type = forcedType || ui.movFormType || 'giden';
+  let jobOpts = '';
+  if (showJobSelect) jobOpts = `<div class="field"><label>İş</label><select id="mv_jobId"><option value="">Seçin…</option>${jobs.map(j=>`<option value="${j.id}">${esc(jobLabel(j))} (${esc(companyById(j.companyId)?.name||'?')})</option>`).join('')}</select></div>`;
+  const typeSelect = forcedType ? '' : `<div class="field"><label>Hareket Tipi</label><select id="mv_type" onchange="ui.movFormType=this.value;render()">
+      <option value="giden" ${type==='giden'?'selected':''}>Giden — Hammadde (firmaya)</option>
+      <option value="gelen" ${type==='gelen'?'selected':''}>Gelen — Ürün / Fason (firmadan)</option>
+    </select></div>`;
+  const giderFields = `
+    <div class="field"><label>Malzeme İsmi</label><input id="mv_materialName"></div>
+    <div class="field"><label>Malzeme Cinsi</label><input id="mv_materialType" placeholder="örn. Paslanmaz Çelik, Alüminyum…"></div>
+    <div class="field"><label>Kalite</label><input id="mv_quality" placeholder="örn. 304, 6061…"></div>
+    <div class="field"><label>Açıklama</label><textarea id="mv_description" rows="2"></textarea></div>`;
+  const gelenFields = `<div class="field"><label>Ürün Adı</label><input id="mv_itemName"></div>`;
+  return `<div class="card" id="movementFormCard">
+    ${jobOpts}
+    ${typeSelect}
+    ${type==='giden'?giderFields:gelenFields}
+    <div class="field"><label>Miktar</label><input id="mv_quantity" type="number" step="0.01"></div>
+    <div class="field"><label>Birim (kg, adet, mt...)</label><input id="mv_unit"></div>
+    <div class="field"><label>Birim Fiyat (₺)</label><input id="mv_unitPrice" type="number" step="0.01"></div>
+    <div class="field"><label>Tarih</label><input id="mv_date" type="date" value="${todayStr()}"></div>
+    <div class="field"><label>Not</label><textarea id="mv_note" rows="2"></textarea></div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="submitMovementForm(${showJobSelect?'true':'false'}, ${defaultJobId?`'${defaultJobId}'`:'null'}, ${forcedType?`'${forcedType}'`:'null'})">Hareketi Kaydet</button>
+      <button class="btn-secondary" onclick="cancelMovementForm()">Vazgeç</button>
+    </div></div>`;
+}
+function submitMovementForm(showJobSelect, defaultJobId, forcedType) {
+  const type = forcedType || document.getElementById('mv_type').value;
+  const jobId = showJobSelect ? document.getElementById('mv_jobId').value : defaultJobId;
+  const quantity = document.getElementById('mv_quantity').value;
+  if (!jobId || !quantity) return;
+  let data = { id: uid(), jobId, type, quantity,
+    unit: document.getElementById('mv_unit').value,
+    unitPrice: document.getElementById('mv_unitPrice').value,
+    date: document.getElementById('mv_date').value,
+    note: document.getElementById('mv_note').value };
+  if (type==='giden') {
+    const materialName = document.getElementById('mv_materialName').value.trim();
+    if (!materialName) return;
+    data.itemName = materialName; data.materialName = materialName;
+    data.materialType = document.getElementById('mv_materialType').value;
+    data.quality = document.getElementById('mv_quality').value;
+    data.description = document.getElementById('mv_description').value;
+  } else {
+    const itemName = document.getElementById('mv_itemName').value.trim();
+    if (!itemName) return;
+    data.itemName = itemName;
+  }
+  movements.push(data); persist();
+  ui.addingMovement=false; ui.addingMovementList=false; ui.movFormType='giden';
+  render(); toast('Hareket eklendi');
+}
+function cancelMovementForm() { ui.addingMovement=false; ui.addingMovementList=false; ui.movFormType='giden'; render(); }
+
+/* ---------- Çoklu hammadde kalemi girişi ---------- */
+function openMultiMaterialForm(jobId) {
+  ui.addingMultiMaterial = jobId; ui.addingMovement = false;
+  materialRows = [blankRow()]; materialFormDate = todayStr(); materialFormNote = '';
+  render();
+}
+function addMaterialRow() { materialRows.push(blankRow()); render(); }
+function removeMaterialRow(i) { if (materialRows.length > 1) { materialRows.splice(i, 1); render(); } }
+function updateMaterialRow(i, field, val) { materialRows[i][field] = val; }
+function cancelMultiMaterial() { ui.addingMultiMaterial = null; materialRows = [blankRow()]; render(); }
+
+function materialRowHtml(row, i) {
+  return `<div class="card" style="margin-bottom:8px">
+    <div class="row" style="margin-bottom:6px">
+      <span class="small muted" style="font-weight:600">Kalem ${i+1}</span>
+      ${materialRows.length>1?`<button class="btn-link" style="color:var(--red)" onclick="removeMaterialRow(${i})">Kaldır</button>`:''}
+    </div>
+    <div class="field"><label>Malzeme İsmi</label><input value="${esc(row.materialName)}" oninput="updateMaterialRow(${i},'materialName',this.value)"></div>
+    <div class="field"><label>Malzeme Cinsi</label><input value="${esc(row.materialType)}" oninput="updateMaterialRow(${i},'materialType',this.value)" placeholder="örn. Paslanmaz Çelik, Alüminyum…"></div>
+    <div class="field"><label>Kalite</label><input value="${esc(row.quality)}" oninput="updateMaterialRow(${i},'quality',this.value)" placeholder="örn. 304, 6061…"></div>
+    <div class="field"><label>Açıklama</label><textarea rows="2" oninput="updateMaterialRow(${i},'description',this.value)">${esc(row.description)}</textarea></div>
+    <div class="grid2">
+      <div class="field"><label>Adet / Miktar</label><input type="number" step="0.01" value="${esc(row.quantity)}" oninput="updateMaterialRow(${i},'quantity',this.value)"></div>
+      <div class="field"><label>Birim</label><input value="${esc(row.unit)}" oninput="updateMaterialRow(${i},'unit',this.value)" placeholder="kg, adet, mt…"></div>
+    </div>
+    <div class="field"><label>Birim Fiyat (₺)</label><input type="number" step="0.01" value="${esc(row.unitPrice)}" oninput="updateMaterialRow(${i},'unitPrice',this.value)"></div>
+  </div>`;
+}
+function renderMultiMaterialForm(jobId) {
+  let out = `<div style="margin-top:10px">`;
+  materialRows.forEach((row, i) => out += materialRowHtml(row, i));
+  out += `<button class="btn-link" onclick="addMaterialRow()">+ Kalem Ekle</button>`;
+  out += `<div class="card" style="margin-top:8px">
+    <div class="field"><label>Tarih (tüm kalemler için)</label><input type="date" value="${materialFormDate}" onchange="materialFormDate=this.value"></div>
+    <div class="field"><label>Genel Not (opsiyonel)</label><textarea rows="2" oninput="materialFormNote=this.value">${esc(materialFormNote)}</textarea></div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="submitMultiMaterial('${jobId}')">Kalemleri Kaydet (${materialRows.length})</button>
+      <button class="btn-secondary" onclick="cancelMultiMaterial()">Vazgeç</button>
+    </div>
+  </div></div>`;
+  return out;
+}
+function submitMultiMaterial(jobId) {
+  let added = 0;
+  materialRows.forEach(row => {
+    if (!row.materialName || !row.materialName.trim() || !row.quantity) return;
+    movements.push({
+      id: uid(), jobId, type: 'giden',
+      itemName: row.materialName, materialName: row.materialName,
+      materialType: row.materialType, quality: row.quality, description: row.description,
+      quantity: row.quantity, unit: row.unit, unitPrice: row.unitPrice,
+      date: materialFormDate, note: materialFormNote,
+    });
+    added++;
+  });
+  if (added === 0) { toast('En az bir kalem için malzeme ismi ve miktar girin'); return; }
+  persist();
+  ui.addingMultiMaterial = null; materialRows = [blankRow()]; materialFormDate = todayStr(); materialFormNote = '';
+  render(); toast(added + ' kalem eklendi');
+}
+
+function movementRow(m) {
+  const isGiden = m.type==='giden'; const tutar = (Number(m.quantity)||0)*(Number(m.unitPrice)||0);
+  const rowKey = 'movement:'+m.id; const confirming = ui.confirmRow===rowKey;
+  const j = jobById(m.jobId); const c = j ? companyById(j.companyId) : null;
+  return `<div class="card">
+    <div class="row" style="align-items:flex-start">
+      <div class="mv-item">
+        <span>${isGiden?'↑':'↓'}</span>
+        <div>
+          <div style="font-size:14px;font-weight:500">${esc(m.itemName)}</div>
+          ${isGiden && (m.quality||m.materialType) ? `<div class="small" style="color:var(--blue-dark);margin-top:2px">${m.materialType?`Cins: ${esc(m.materialType)}`:''}${m.materialType&&m.quality?' · ':''}${m.quality?`Kalite: ${esc(m.quality)}`:''}</div>`:''}
+          ${isGiden && m.description ? `<div class="small muted" style="margin-top:2px">${esc(m.description)}</div>`:''}
+          <div class="small muted" style="margin-top:2px">${m.quantity} ${esc(m.unit)} × ${money(m.unitPrice)} · ${fmtDate(m.date)}</div>
+          ${j ? `<div class="small muted" style="margin-top:2px">${esc(jobLabel(j))} · ${esc(c?.name||'?')}</div>` : ''}
+          ${m.note?`<div class="small muted" style="margin-top:2px">${esc(m.note)}</div>`:''}
+        </div>
+      </div>
+      <div class="mv-amount" style="color:${isGiden?'var(--amber)':'var(--green)'}">${money(tutar)}</div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:6px">
+      ${confirming ? `<div style="display:flex;gap:8px">
+        <button class="btn-link" style="color:var(--red)" onclick="deleteMovement('${m.id}')">Evet, sil</button>
+        <button class="btn-link" onclick="ui.confirmRow=null;render()">Vazgeç</button></div>`
+
+      : `<button class="btn-link muted" style="font-size:11px" onclick="ui.confirmRow='${rowKey}';render()">Sil</button>`}
+    </div></div>`;
+}
+function deleteMovement(id) { movements = movements.filter(m=>m.id!==id); persist(); ui.confirmRow=null; render(); toast('Hareket silindi'); }
+
+function renderMovementsList() {
+  let filtered = [...movements].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if (ui.movTypeFilter) filtered = filtered.filter(m=>m.type===ui.movTypeFilter);
+  if (ui.movCompanyFilter) filtered = filtered.filter(m=>{ const j=jobById(m.jobId); return j && j.companyId===ui.movCompanyFilter; });
+
+  let out = `<div class="toolbar">`;
+  out += `<button class="btn-primary" ${jobs.length===0?'disabled':''} onclick="ui.addingMovementList=true;render()">+ Yeni Hareket</button>`;
+  out += `<button class="btn-excel" onclick="exportMovements()">⬇ Excel'e Aktar</button>`;
+  out += `<button class="btn-excel" onclick="triggerImport('movements')">⬆ Excel'den Yükle</button>`;
+  out += `</div>`;
+  if (jobs.length===0) out += `<div class="small muted" style="margin-bottom:10px">Hareket eklemeden önce bir iş oluşturun.</div>`;
+  if (ui.addingMovementList) out += movementForm(true, null);
+
+  out += `<div class="chip-row">
+    <span class="chip ${ui.movTypeFilter===''?'active':''}" onclick="ui.movTypeFilter='';render()">Tümü</span>
+    <span class="chip ${ui.movTypeFilter==='giden'?'active':''}" onclick="ui.movTypeFilter='giden';render()">Giden</span>
+    <span class="chip ${ui.movTypeFilter==='gelen'?'active':''}" onclick="ui.movTypeFilter='gelen';render()">Gelen</span>
+  </div>`;
+  if (companies.length>0) {
+    out += `<div class="filterbar"><select onchange="ui.movCompanyFilter=this.value;render()">
+      <option value="">Tüm Firmalar</option>${companies.map(c=>`<option value="${c.id}" ${ui.movCompanyFilter===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>`;
+  }
+
+  out += `<div class="stack">`;
+  if (filtered.length===0 && !ui.addingMovementList) out += `<div class="empty">Hareket bulunamadı.</div>`;
+  filtered.forEach(m => out += movementRow(m));
+  out += `</div>`;
+  return out;
+}
+
+/* ---------- HATIRLATICILAR ---------- */
+function reminderForm(defaultJobId) {
+  return `<div class="card">
+    <div class="field"><label>Hatırlatıcı Başlığı</label><input id="rm_title"></div>
+    <div class="field"><label>Tarih</label><input id="rm_date" type="date" value="${todayStr()}"></div>
+    ${defaultJobId ? '' : `<div class="field"><label>İşle İlişkilendir (opsiyonel)</label><select id="rm_jobId"><option value="">Yok</option>${jobs.map(j=>`<option value="${j.id}">${esc(jobLabel(j))} (${esc(companyById(j.companyId)?.name||'?')})</option>`).join('')}</select></div>`}
+    <div class="field"><label>Not</label><textarea id="rm_note" rows="2"></textarea></div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="submitReminderForm(${defaultJobId?`'${defaultJobId}'`:'null'})">Hatırlatıcıyı Kaydet</button>
+      <button class="btn-secondary" onclick="cancelReminderForm()">Vazgeç</button>
+    </div></div>`;
+}
+function submitReminderForm(defaultJobId) {
+  const title = document.getElementById('rm_title').value.trim(); if (!title) return;
+  const jobId = defaultJobId || document.getElementById('rm_jobId').value || null;
+  reminders.push({ id: uid(), title, date: document.getElementById('rm_date').value, jobId,
+    note: document.getElementById('rm_note').value, done: false });
+  persist(); ui.addingReminderInJob=false; ui.addingReminderList=false; render(); toast('Hatırlatıcı eklendi');
+}
+function cancelReminderForm() { ui.addingReminderInJob=false; ui.addingReminderList=false; render(); }
+
+function reminderRow(r) {
+  const st = reminderState(r);
+  const color = st==='done'?'var(--muted)':st==='overdue'?'var(--red)':st==='today'?'var(--amber)':'var(--blue)';
+  const label = st==='overdue'?'Gecikti':st==='today'?'Bugün':st==='done'?'Tamamlandı':'Yaklaşıyor';
+  const j = r.jobId ? jobById(r.jobId) : null; const c = j ? companyById(j.companyId) : null;
+  const rowKey='reminder:'+r.id; const confirming = ui.confirmRow===rowKey;
+  return `<div class="card" style="opacity:${r.done?0.6:1}">
+    <div style="display:flex;gap:10px;align-items:flex-start">
+      <button class="checkbox-circle ${r.done?'done':''}" onclick="toggleReminder('${r.id}')">${r.done?'✓':''}</button>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:500;text-decoration:${r.done?'line-through':'none'}">${esc(r.title)}</div>
+        <div class="small" style="color:${color};margin-top:2px">${fmtDate(r.date)} · ${label}</div>
+        ${j?`<div class="small muted" style="margin-top:2px">${esc(jobLabel(j))}${c?' · '+esc(c.name):''}</div>`:''}
+        ${r.note?`<div class="small muted" style="margin-top:2px">${esc(r.note)}</div>`:''}
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:6px">
+      ${confirming ? `<div style="display:flex;gap:8px">
+        <button class="btn-link" style="color:var(--red)" onclick="deleteReminder('${r.id}')">Evet, sil</button>
+        <button class="btn-link" onclick="ui.confirmRow=null;render()">Vazgeç</button></div>`
+      : `<button class="btn-link muted" style="font-size:11px" onclick="ui.confirmRow='${rowKey}';render()">Sil</button>`}
+    </div></div>`;
+}
+function toggleReminder(id) { const r = reminders.find(x=>x.id===id); r.done = !r.done; persist(); render(); }
+function deleteReminder(id) { reminders = reminders.filter(r=>r.id!==id); persist(); ui.confirmRow=null; render(); toast('Hatırlatıcı silindi'); }
+
+function renderRemindersList() {
+  let filtered = [...reminders].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  if (ui.reminderFilter==='pending') filtered = filtered.filter(r=>!r.done);
+  else if (ui.reminderFilter==='done') filtered = filtered.filter(r=>r.done);
+
+  let out = `<div class="toolbar">`;
+  out += `<button class="btn-primary" onclick="ui.addingReminderList=true;render()">+ Yeni Hatırlatıcı</button>`;
+  out += `<button class="btn-excel" onclick="exportReminders()">⬇ Excel'e Aktar</button>`;
+  out += `<button class="btn-excel" onclick="triggerImport('reminders')">⬆ Excel'den Yükle</button>`;
+  out += `</div>`;
+  if (ui.addingReminderList) out += reminderForm(null);
+  out += `<div class="chip-row">
+    <span class="chip ${ui.reminderFilter==='pending'?'active':''}" onclick="ui.reminderFilter='pending';render()">Bekleyen</span>
+    <span class="chip ${ui.reminderFilter==='done'?'active':''}" onclick="ui.reminderFilter='done';render()">Tamamlanan</span>
+    <span class="chip ${ui.reminderFilter==='all'?'active':''}" onclick="ui.reminderFilter='all';render()">Tümü</span>
+  </div>`;
+  out += `<div class="stack">`;
+  if (filtered.length===0 && !ui.addingReminderList) out += `<div class="empty">Hatırlatıcı bulunamadı.</div>`;
+  filtered.forEach(r => out += reminderRow(r));
+  out += `</div>`;
+  return out;
+}
+
+/* ---------- Olay bağlama (form dışı butonlar zaten inline onclick kullanıyor) ---------- */
+function attachContentEvents() { /* inline onclick kullanıldığı için ek bağlama gerekmiyor */ }
+
+/* ---------- Excel'e Aktar / Excel'den Yükle ---------- */
+let importTarget = null;
+
+function exportToExcel(filename, sheetName, rows) {
+  if (typeof XLSX === 'undefined') { toast('Excel kütüphanesi yüklenemedi (internet gerekli)'); return; }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, filename);
+  toast('Excel dosyası indirildi');
+}
+
+function triggerImport(target) {
+  importTarget = target;
+  const input = document.getElementById('excelImportInput');
+  input.value = '';
+  input.click();
+}
+
+function handleExcelImport(input) {
+  const file = input.files[0]; if (!file) return;
+  if (typeof XLSX === 'undefined') { toast('Excel kütüphanesi yüklenemedi (internet gerekli)'); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      if (importTarget === 'companies') importCompaniesRows(rows);
+      else if (importTarget === 'jobs') importJobsRows(rows);
+      else if (importTarget === 'movements') importMovementsRows(rows);
+      else if (importTarget === 'reminders') importRemindersRows(rows);
+    } catch (err) { console.error(err); toast('Excel dosyası okunamadı — format hatalı olabilir'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function val(row, keys) {
+  for (const k of keys) { if (row[k] !== undefined && row[k] !== '') return row[k]; }
+  return '';
+}
+
+/* ---- Firmalar ---- */
+function exportCompanies() {
+  const rows = companies.map(c => ({
+    'Firma Adı': c.name || '', 'Yetkili / Telefon': c.contact || '', 'Not': c.note || '',
+  }));
+  exportToExcel('firmalar.xlsx', 'Firmalar', rows);
+}
+function importCompaniesRows(rows) {
+  let added = 0;
+  rows.forEach(r => {
+    const name = String(val(r, ['Firma Adı','Firma'])).trim();
+    if (!name) return;
+    if (companies.some(c => c.name.toLowerCase() === name.toLowerCase())) return;
+    companies.push({ id: uid(), name, contact: String(val(r, ['Yetkili / Telefon','Yetkili'])), note: String(val(r, ['Not'])) });
+    added++;
+  });
+  persist(); render(); toast(added + ' firma eklendi');
+}
+
+/* ---- İşler ---- */
+function findOrCreateCompany(name) {
+  if (!name) return null;
+  let c = companies.find(c => c.name.toLowerCase() === name.toLowerCase());
+  if (!c) { c = { id: uid(), name, contact:'', note:'' }; companies.push(c); }
+  return c;
+}
+function exportJobs() {
+  const rows = jobs.map(j => ({
+    'Firma Adı': companyById(j.companyId)?.name || '', 'Proje Kodu': j.projectCode || '', 'Proje İsmi': j.projectName || '',
+    'Adet / Miktar': j.quantity || '', 'Ücret': j.fee || '', 'Teknik Resim Referansı': j.drawingRef || '',
+    'Açıklama': j.description || '', 'Durum': STATUS[j.status]?.label || '', 'Oluşturma Tarihi': j.createdDate || '',
+  }));
+  exportToExcel('isler.xlsx', 'İşler', rows);
+}
+function importJobsRows(rows) {
+  let added = 0;
+  const statusMap = { 'bekliyor':'bekliyor', 'üretimde':'uretimde', 'tamamlandı':'tamamlandi' };
+  rows.forEach(r => {
+    const companyName = String(val(r, ['Firma Adı','Firma'])).trim();
+    const projectName = String(val(r, ['Proje İsmi'])).trim();
+    if (!companyName || !projectName) return;
+    const c = findOrCreateCompany(companyName);
+    jobs.push({
+      id: uid(), companyId: c.id,
+      projectCode: String(val(r, ['Proje Kodu'])), projectName,
+      quantity: String(val(r, ['Adet / Miktar','Adet'])), fee: String(val(r, ['Ücret'])),
+      drawingRef: String(val(r, ['Teknik Resim Referansı'])), description: String(val(r, ['Açıklama'])),
+      status: statusMap[String(val(r, ['Durum'])).toLowerCase()] || 'bekliyor',
+      createdDate: String(val(r, ['Oluşturma Tarihi'])) || todayStr(),
+    });
+    added++;
+  });
+  persist(); render(); toast(added + ' iş eklendi');
+}
+
+/* ---- Hareketler ---- */
+function findJobByCodeAndCompany(code, companyName) {
+  const c = companies.find(c => c.name.toLowerCase() === String(companyName||'').toLowerCase());
+  if (!c) return null;
+  return jobs.find(j => j.companyId===c.id && String(j.projectCode||'').toLowerCase() === String(code||'').toLowerCase());
+}
+function exportMovements() {
+  const rows = movements.map(m => {
+    const j = jobById(m.jobId); const c = j ? companyById(j.companyId) : null;
+    return {
+      'Firma Adı': c?.name || '', 'Proje Kodu': j?.projectCode || '', 'Proje İsmi': j?.projectName || '',
+      'Tip': m.type==='giden' ? 'Giden (Hammadde)' : 'Gelen (Ürün/Fason)',
+      'Malzeme / Ürün Adı': m.itemName || '', 'Malzeme Cinsi': m.materialType || '', 'Kalite': m.quality || '',
+      'Açıklama': m.description || '', 'Miktar': m.quantity || '', 'Birim': m.unit || '',
+      'Birim Fiyat': m.unitPrice || '', 'Tutar': (Number(m.quantity)||0)*(Number(m.unitPrice)||0),
+      'Tarih': m.date || '', 'Not': m.note || '',
+    };
+  });
+  exportToExcel('hareketler.xlsx', 'Hareketler', rows);
+}
+function importMovementsRows(rows) {
+  let added = 0, skipped = 0;
+  rows.forEach(r => {
+    const companyName = String(val(r, ['Firma Adı','Firma'])).trim();
+    const code = String(val(r, ['Proje Kodu'])).trim();
+    const job = findJobByCodeAndCompany(code, companyName);
+    if (!job) { skipped++; return; }
+    const itemName = String(val(r, ['Malzeme / Ürün Adı','Malzeme Ismi','Ürün Adı'])).trim();
+    if (!itemName) { skipped++; return; }
+    const typeLabel = String(val(r, ['Tip']));
+    const type = typeLabel.toLowerCase().startsWith('gelen') ? 'gelen' : 'giden';
+    let data = {
+      id: uid(), jobId: job.id, type, itemName,
+      quantity: String(val(r, ['Miktar'])), unit: String(val(r, ['Birim'])),
+      unitPrice: String(val(r, ['Birim Fiyat'])), date: String(val(r, ['Tarih'])) || todayStr(),
+      note: String(val(r, ['Not'])),
+    };
+    if (type === 'giden') {
+      data.materialName = itemName;
+      data.materialType = String(val(r, ['Malzeme Cinsi']));
+      data.quality = String(val(r, ['Kalite']));
+      data.description = String(val(r, ['Açıklama']));
+    }
+    movements.push(data); added++;
+  });
+  persist(); render();
+  toast(added + ' hareket eklendi' + (skipped ? ', ' + skipped + ' satır atlandı (eşleşen iş bulunamadı)' : ''));
+}
+
+/* ---- Hatırlatıcılar ---- */
+function exportReminders() {
+  const rows = reminders.map(r => {
+    const j = r.jobId ? jobById(r.jobId) : null;
+    return {
+      'Başlık': r.title || '', 'Tarih': r.date || '', 'Durum': r.done ? 'Tamamlandı' : 'Bekliyor',
+      'İlişkili Proje Kodu': j?.projectCode || '', 'İlişkili Firma': j ? (companyById(j.companyId)?.name || '') : '',
+      'Not': r.note || '',
+    };
+  });
+  exportToExcel('hatirlaticilar.xlsx', 'Hatırlatıcılar', rows);
+}
+function importRemindersRows(rows) {
+  let added = 0;
+  rows.forEach(r => {
+    const title = String(val(r, ['Başlık'])).trim();
+    if (!title) return;
+    const companyName = String(val(r, ['İlişkili Firma']));
+    const code = String(val(r, ['İlişkili Proje Kodu']));
+    const job = code ? findJobByCodeAndCompany(code, companyName) : null;
+    reminders.push({
+      id: uid(), title, date: String(val(r, ['Tarih'])), jobId: job ? job.id : null,
+      note: String(val(r, ['Not'])), done: String(val(r, ['Durum'])).toLowerCase().includes('tamam'),
+    });
+    added++;
+  });
+  persist(); render(); toast(added + ' hatırlatıcı eklendi');
+}
+</script>
+
+<!-- ============================================================
+     FIREBASE AYARLARI — aşağıdaki firebaseConfig değerlerini
+     kendi Firebase projenizden kopyalayıp buraya yapıştırın.
+     ============================================================ -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+  import {
+    getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+    createUserWithEmailAndPassword, signOut,
+    GoogleAuthProvider, signInWithRedirect, getRedirectResult
+  } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+  import {
+    getFirestore, doc, setDoc, onSnapshot, enableIndexedDbPersistence
+  } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCV1HY4b6BWH8fg03Vrd5NgMLLWrvMEoIw",
+    authDomain: "saklaz-f1287.firebaseapp.com",
+    projectId: "saklaz-f1287",
+    storageBucket: "saklaz-f1287.firebasestorage.app",
+    messagingSenderId: "708542271677",
+    appId: "1:708542271677:web:f785107789ae4b848f67d4"
+  };
+
+  const fbApp = initializeApp(firebaseConfig);
+  const auth = getAuth(fbApp);
+  const db = getFirestore(fbApp);
+  try { await enableIndexedDbPersistence(db); } catch (e) { /* birden fazla sekme açıksa göz ardı edilir */ }
+
+  window.fb = {
+    auth, db, doc, setDoc, onSnapshot,
+    signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
+    GoogleAuthProvider, signInWithRedirect
+  };
+
+  getRedirectResult(auth).catch((e) => {
+    const errEl = document.getElementById('loginError');
+    if (errEl) errEl.textContent = 'Google girişi başarısız: ' + (e.code || e.message || 'bilinmeyen hata');
+  });
+
+  if (window.startApp) window.startApp();
+</script>
+</body>
+</html>
