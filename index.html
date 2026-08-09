@@ -106,34 +106,16 @@
   @media (min-width: 861px) { #toast { bottom:24px; } }
   #loginScreen { height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:24px; background:var(--paper); }
   #loginScreen .box { width:100%; max-width:340px; }
-  #loginScreen .brand, #roleScreen .brand { text-align:center; margin-bottom:22px; }
-  #loginScreen .brand .mark, #roleScreen .brand .mark { width:44px; height:44px; border-radius:10px; background:var(--blue); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:16px; margin:0 auto 12px; }
-  #loginScreen .brand .name, #roleScreen .brand .name { font-size:19px; font-weight:700; }
-  #loginScreen .brand .sub, #roleScreen .brand .sub { font-size:12px; color:var(--muted); margin-top:2px; }
+  #loginScreen .brand { text-align:center; margin-bottom:22px; }
+  #loginScreen .brand .mark { width:44px; height:44px; border-radius:10px; background:var(--blue); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:16px; margin:0 auto 12px; }
+  #loginScreen .brand .name { font-size:19px; font-weight:700; }
+  #loginScreen .brand .sub { font-size:12px; color:var(--muted); margin-top:2px; }
   #loginError { color:var(--red); font-size:12px; margin-top:8px; min-height:16px; }
   body.viewer-mode .admin-only { display:none !important; }
   .role-badge { font-size:10px; padding:2px 8px; border-radius:999px; font-weight:600; display:inline-block; }
 </style>
 </head>
 <body>
-<div id="roleScreen" style="display:none; height:100vh; flex-direction:column; justify-content:center; align-items:center; padding:24px; background:var(--paper);">
-  <div class="box" style="width:100%; max-width:360px;">
-    <div class="brand">
-      <div class="mark">FT</div>
-      <div class="name">Hesap Türünüz</div>
-      <div class="sub">Bu hesabı ilk kez kullanıyorsunuz</div>
-    </div>
-    <div class="card stack">
-      <button class="btn-primary" style="width:100%" onclick="chooseAdmin()">İşletme Sahibiyim (Yönetici)</button>
-      <div class="small muted">Kendi verilerinizi oluşturur, düzenleme yetkisine sahip olursunuz.</div>
-      <div style="height:1px;background:var(--line);margin:6px 0"></div>
-      <div class="field"><label>İşletme Kodu (yöneticinizden alın)</label><input id="role_code" placeholder="Örn. Xy93k..."></div>
-      <button class="btn-secondary" style="width:100%" onclick="chooseViewer()">Bir İşletmeye Katıl (Görüntüleyici)</button>
-      <div id="roleError" style="color:var(--red);font-size:12px;min-height:16px"></div>
-    </div>
-  </div>
-</div>
-
 <div id="loginScreen">
   <div class="box">
     <div class="brand">
@@ -141,7 +123,12 @@
       <div class="name">Fason Takip</div>
       <div class="sub">Tüm cihazlarda senkronize çalışır</div>
     </div>
-    <div class="card">
+    <div class="chip-row" style="justify-content:center">
+      <span class="chip active" id="tabAdminBtn" onclick="setLoginTab('admin')">Yönetici</span>
+      <span class="chip" id="tabViewerBtn" onclick="setLoginTab('viewer')">Görüntüleyici</span>
+    </div>
+
+    <div id="adminLoginPanel" class="card">
       <button class="btn-secondary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; padding:11px" onclick="doGoogleLogin()">
         <svg width="17" height="17" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20.5H24v7h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l5.8 4.2C13.6 15.1 18.4 12 24 12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.5 5.1 29.5 3 24 3 16 3 9.1 7.6 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.4 0 10.3-2.1 14-5.5l-6.5-5.4C29.5 35.9 26.9 37 24 37c-5.3 0-9.7-3.4-11.3-8l-6.5 5c2.8 7.1 9.7 12 17.8 12z"/><path fill="#1976D2" d="M43.6 20.5H42V20.5H24v7h11.3c-.8 2.3-2.2 4.2-4 5.6l6.5 5.4C39.8 36.6 43 30.9 43 24c0-1.2-.1-2.3-.4-3.5z"/></svg>
         Google ile Giriş Yap
@@ -153,7 +140,15 @@
       <div class="form-actions"><button class="btn-primary" style="flex:1" onclick="doLogin()">Giriş Yap</button></div>
       <div style="text-align:center;margin-top:14px"><button class="btn-link" onclick="doSignup()">İlk kez mi giriyorsunuz? Hesap oluştur</button></div>
     </div>
-    <div class="small muted" style="text-align:center;margin-top:16px">Tüm cihazlarınızda aynı yöntemle (Google veya e-posta/şifre) giriş yapın — veriler otomatik senkronize olur.</div>
+
+    <div id="viewerLoginPanel" class="card" style="display:none">
+      <div class="small muted" style="margin-bottom:12px">Yöneticinizden aldığınız erişim koduyla doğrudan giriş yapın. Hesap açmanıza gerek yok.</div>
+      <div class="field"><label>Erişim Kodu</label><input id="viewer_code" placeholder="Örn. A3F9K2" style="text-transform:uppercase;letter-spacing:.05em;font-family:ui-monospace,monospace"></div>
+      <div id="viewerLoginError" style="color:var(--red);font-size:12px;min-height:16px"></div>
+      <button class="btn-primary" style="width:100%" onclick="doViewerLogin()">Kodla Giriş Yap</button>
+    </div>
+
+    <div class="small muted" style="text-align:center;margin-top:16px">Yöneticiyseniz Google veya e-posta ile giriş yapın. Görüntüleyiciyseniz yöneticinizden aldığınız kodu kullanın.</div>
   </div>
 </div>
 
@@ -166,7 +161,6 @@
     </div>
     <nav id="sidebarNav"></nav>
     <div class="foot" style="display:flex;flex-direction:column;gap:6px">
-      <button onclick="resetRole()">Rolü / İşletmeyi Değiştir</button>
       <button onclick="doLogout()">Çıkış Yap</button>
     </div>
   </aside>
@@ -185,12 +179,15 @@
 <div id="toast"></div>
 
 <script>
+/* ---------- ÖNEMLİ: Yönetici e-postanızı buraya yazın ---------- */
+const ADMIN_EMAIL = "fatihsak.lyoness@gmail.com"; // <-- Bu satırı kendi giriş yaptığınız e-posta ile değiştirin!
+
 /* ---------- Depolama (Firebase Firestore ile senkron) ---------- */
 let companies = [];
 let jobs = [];
 let movements = [];
 let reminders = [];
-let members = [];
+let accessCodes = [];
 let currentUser = null;
 let workspaceOwnerId = null;
 let userRole = null; // 'admin' | 'viewer'
@@ -232,7 +229,7 @@ function subscribeToData() {
       loadedFlags[key] = true;
       if (allLoaded()) render();
       if (err && err.code === 'permission-denied') {
-        document.getElementById('content').innerHTML = '<div class="content-inner pt"><div class="card"><div style="font-weight:600;margin-bottom:6px">Erişim reddedildi</div><div class="small muted">Bu işletme koduna erişiminiz yok, ya da yöneticiniz sizi henüz kullanıcı listesine eklemedi. Doğru kodu girdiğinizden emin olun ve yöneticinizle iletişime geçin.</div><button class="btn-link" style="margin-top:10px" onclick="resetRole()">Farklı bir seçenek dene</button></div></div>';
+        document.getElementById('content').innerHTML = '<div class="content-inner pt"><div class="card"><div style="font-weight:600;margin-bottom:6px">Erişim reddedildi</div><div class="small muted">Bu koda erişiminiz yok, ya da yöneticiniz bu kodu iptal etmiş olabilir. Yöneticinizle iletişime geçip yeni bir kod isteyin.</div><button class="btn-link" style="margin-top:10px" onclick="doLogout()">Çıkış yap, tekrar dene</button></div></div>';
       }
     });
     unsubscribers.push(unsub);
@@ -299,10 +296,6 @@ function doSignup() {
     errEl.textContent = 'Hesap oluşturulamadı: ' + friendlyAuthError(e.code);
   });
 }
-function doLogout() {
-  unsubscribers.forEach(u => u()); unsubscribers = [];
-  window.fb.signOut(window.fb.auth);
-}
 function friendlyAuthError(code) {
   const map = {
     'auth/invalid-email': 'geçersiz e-posta adresi', 'auth/user-not-found': 'kullanıcı bulunamadı',
@@ -313,35 +306,43 @@ function friendlyAuthError(code) {
   return map[code] || code || 'bilinmeyen hata';
 }
 
-function chooseAdmin() {
-  workspaceOwnerId = currentUser.uid; userRole = 'admin';
-  saveWorkspaceInfo(currentUser.uid, { workspaceOwnerId, role: 'admin' });
-  enterApp();
+let viewerLoginInProgress = false;
+function setLoginTab(tab) {
+  document.getElementById('tabAdminBtn').classList.toggle('active', tab==='admin');
+  document.getElementById('tabViewerBtn').classList.toggle('active', tab==='viewer');
+  document.getElementById('adminLoginPanel').style.display = tab==='admin' ? 'block' : 'none';
+  document.getElementById('viewerLoginPanel').style.display = tab==='viewer' ? 'block' : 'none';
 }
-function chooseViewer() {
-  const code = document.getElementById('role_code').value.trim();
-  const errEl = document.getElementById('roleError');
-  if (!code) { errEl.textContent = 'İşletme kodu gerekli.'; return; }
-  errEl.textContent = '';
-  workspaceOwnerId = code; userRole = 'viewer';
-  saveWorkspaceInfo(currentUser.uid, { workspaceOwnerId, role: 'viewer' });
-  enterApp();
+
+async function doViewerLogin() {
+  if (!window.fb) { document.getElementById('viewerLoginError').textContent = 'Sistem henüz yüklenmedi, birkaç saniye bekleyip tekrar deneyin.'; return; }
+  const code = document.getElementById('viewer_code').value.trim().toUpperCase();
+  const errEl = document.getElementById('viewerLoginError'); errEl.textContent = '';
+  if (!code) { errEl.textContent = 'Kod gerekli.'; return; }
+  viewerLoginInProgress = true;
+  try {
+    const { auth, signInAnonymously, db, doc, getDoc, setDoc } = window.fb;
+    let user = auth.currentUser;
+    if (!user) {
+      const cred = await signInAnonymously(auth);
+      user = cred.user;
+    }
+    const codeSnap = await getDoc(doc(db, 'codes', code));
+    if (!codeSnap.exists()) { errEl.textContent = 'Kod geçersiz ya da iptal edilmiş.'; viewerLoginInProgress = false; return; }
+    const ownerId = codeSnap.data().ownerId;
+    await setDoc(doc(db, 'workspaces', ownerId, 'members', user.uid), { role: 'viewer', code, joinedAt: new Date().toISOString() });
+    currentUser = user; workspaceOwnerId = ownerId; userRole = 'viewer';
+    saveWorkspaceInfo(user.uid, { workspaceOwnerId, role: 'viewer' });
+    viewerLoginInProgress = false;
+    enterApp();
+  } catch (e) {
+    console.error(e);
+    errEl.textContent = 'Giriş başarısız: kod geçersiz olabilir ya da bağlantı sorunu var.';
+    viewerLoginInProgress = false;
+  }
 }
-function showRoleScreen() {
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('shell').style.display = 'none';
-  document.getElementById('roleScreen').style.display = 'flex';
-}
-function resetRole() {
-  unsubscribers.forEach(u => u()); unsubscribers = [];
-  companies = []; jobs = []; movements = []; reminders = [];
-  if (currentUser) localStorage.removeItem(workspaceStorageKey(currentUser.uid));
-  workspaceOwnerId = null; userRole = null;
-  document.getElementById('shell').style.display = 'none';
-  showRoleScreen();
-}
+
 async function enterApp() {
-  document.getElementById('roleScreen').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('shell').style.display = 'flex';
   document.body.classList.toggle('viewer-mode', userRole !== 'admin');
@@ -356,26 +357,47 @@ async function enterApp() {
 
 function startApp() {
   window.fb.onAuthStateChanged(window.fb.auth, (user) => {
-    if (user) {
-      currentUser = user;
-      const info = loadWorkspaceInfo(user.uid);
-      if (info && info.workspaceOwnerId) {
-        workspaceOwnerId = info.workspaceOwnerId; userRole = info.role;
-        enterApp();
-      } else {
-        showRoleScreen();
-      }
-    } else {
+    if (!user) {
       currentUser = null; workspaceOwnerId = null; userRole = null;
       unsubscribers.forEach(u => u()); unsubscribers = [];
       companies = []; jobs = []; movements = []; reminders = [];
-      document.getElementById('roleScreen').style.display = 'none';
       document.getElementById('loginScreen').style.display = 'flex';
       document.getElementById('shell').style.display = 'none';
+      return;
     }
+    if (user.isAnonymous) {
+      if (viewerLoginInProgress) return; // doViewerLogin akışı zaten hallediyor
+      currentUser = user;
+      const info = loadWorkspaceInfo(user.uid);
+      if (info && info.workspaceOwnerId) {
+        workspaceOwnerId = info.workspaceOwnerId; userRole = 'viewer';
+        enterApp();
+      } else {
+        setLoginTab('viewer');
+      }
+      return;
+    }
+    // Google veya e-posta/şifre ile giriş yapmış gerçek hesap — sadece yönetici e-postası kabul edilir
+    const email = (user.email || '').toLowerCase();
+    if (email !== ADMIN_EMAIL.toLowerCase()) {
+      const errEl = document.getElementById('loginError');
+      if (errEl) errEl.textContent = 'Bu hesap yönetici olarak tanımlı değil. "Görüntüleyici" sekmesinden kodunuzla giriş yapın.';
+      window.fb.signOut(window.fb.auth);
+      return;
+    }
+    currentUser = user;
+    workspaceOwnerId = user.uid; userRole = 'admin';
+    saveWorkspaceInfo(user.uid, { workspaceOwnerId, role: 'admin' });
+    enterApp();
   });
 }
 window.startApp = startApp;
+
+function doLogout() {
+  if (currentUser) localStorage.removeItem(workspaceStorageKey(currentUser.uid));
+  unsubscribers.forEach(u => u()); unsubscribers = [];
+  window.fb.signOut(window.fb.auth);
+}
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function money(n) { const v = Number(n)||0; return v.toLocaleString('tr-TR',{style:'currency',currency:'TRY',maximumFractionDigits:2}); }
@@ -455,7 +477,7 @@ function render() {
   document.getElementById('sidebarNav').innerHTML = renderSidebarNav(alertCount);
   document.body.classList.toggle('viewer-mode', userRole !== 'admin');
   attachContentEvents();
-  if (ui.tab === 'users' && userRole === 'admin' && members.length === 0) refreshMembers();
+  if (ui.tab === 'users' && userRole === 'admin' && accessCodes.length === 0) refreshAccessCodes();
 }
 
 function navItems() {
@@ -543,6 +565,7 @@ function renderCompaniesList() {
   out += `<button class="btn-primary admin-only" onclick="ui.addingCompany=true;render()">+ Yeni Firma</button>`;
   out += `<button class="btn-excel" onclick="exportCompanies()">⬇ Excel'e Aktar</button>`;
   out += `<button class="btn-excel admin-only" onclick="triggerImport('companies')">⬆ Excel'den Yükle</button>`;
+  out += `<button class="btn-excel admin-only" onclick="downloadTemplate('companies')">📄 Şablon İndir</button>`;
   out += `</div>`;
   if (ui.addingCompany) out += companyForm();
   out += `<div class="stack" style="margin-top:12px">`;
@@ -633,6 +656,7 @@ function renderJobsList() {
   out += `<button class="btn-primary admin-only" ${companies.length===0?'disabled':''} onclick="ui.addingJob=true;render()">+ Yeni İş</button>`;
   out += `<button class="btn-excel" onclick="exportJobs()">⬇ Excel'e Aktar</button>`;
   out += `<button class="btn-excel admin-only" onclick="triggerImport('jobs')">⬆ Excel'den Yükle</button>`;
+  out += `<button class="btn-excel admin-only" onclick="downloadTemplate('jobs')">📄 Şablon İndir</button>`;
   out += `</div>`;
   if (companies.length===0) out += `<div class="small muted" style="margin-bottom:10px">İş eklemeden önce bir firma oluşturun.</div>`;
   if (ui.addingJob) out += jobForm();
@@ -711,6 +735,11 @@ function renderJobDetail() {
     <div class="stat"><div class="lbl">Giden Hammadde</div><div class="val" style="color:var(--amber)">${money(gidenTutar)}</div></div>
     <div class="stat"><div class="lbl">Gelen Fason</div><div class="val" style="color:var(--green)">${money(gelenTutar)}</div></div>
     <div class="stat"><div class="lbl">İş Ücreti</div><div class="val" style="color:var(--blue)">${money(j.fee)}</div></div>
+  </div>`;
+
+  out += `<div class="card" style="margin-top:12px">
+    <div class="small muted" style="margin-bottom:8px;font-weight:600">Kalite Kontrolü</div>
+    <div style="display:flex;gap:6px">${qcPills(j)}</div>
   </div>`;
 
   if (userRole === 'admin') {
@@ -957,6 +986,7 @@ function renderMovementsList() {
   out += `<button class="btn-primary admin-only" ${jobs.length===0?'disabled':''} onclick="ui.addingMovementList=true;render()">+ Yeni Hareket</button>`;
   out += `<button class="btn-excel" onclick="exportMovements()">⬇ Excel'e Aktar</button>`;
   out += `<button class="btn-excel admin-only" onclick="triggerImport('movements')">⬆ Excel'den Yükle</button>`;
+  out += `<button class="btn-excel admin-only" onclick="downloadTemplate('movements')">📄 Şablon İndir</button>`;
   out += `</div>`;
   if (jobs.length===0) out += `<div class="small muted" style="margin-bottom:10px">Hareket eklemeden önce bir iş oluşturun.</div>`;
   if (ui.addingMovementList) out += movementForm(true, null);
@@ -1060,6 +1090,7 @@ function renderRemindersList() {
   out += `<button class="btn-primary admin-only" onclick="ui.addingReminderList=true;render()">+ Yeni Hatırlatıcı</button>`;
   out += `<button class="btn-excel" onclick="exportReminders()">⬇ Excel'e Aktar</button>`;
   out += `<button class="btn-excel admin-only" onclick="triggerImport('reminders')">⬆ Excel'den Yükle</button>`;
+  out += `<button class="btn-excel admin-only" onclick="downloadTemplate('reminders')">📄 Şablon İndir</button>`;
   out += `</div>`;
   if (ui.addingReminderList) out += reminderForm(null);
   out += `<div class="chip-row">
@@ -1094,6 +1125,34 @@ function triggerImport(target) {
   const input = document.getElementById('excelImportInput');
   input.value = '';
   input.click();
+}
+
+const EXCEL_TEMPLATES = {
+  companies: {
+    headers: ['Firma Adı', 'Yetkili / Telefon', 'Not'],
+    sample: ['Örnek Firma A.Ş.', 'Ahmet Yılmaz - 0532 000 00 00', 'Örnek not'],
+  },
+  jobs: {
+    headers: ['Firma Adı', 'Proje Kodu', 'Proje İsmi', 'Adet / Miktar', 'Ücret', 'Teknik Resim Referansı', 'Açıklama', 'Durum', 'Oluşturma Tarihi'],
+    sample: ['Örnek Firma A.Ş.', 'PRJ-001', 'Örnek Proje', 100, 5000, 'TR-001', 'Açıklama örneği', 'Bekliyor', '2026-01-15'],
+  },
+  movements: {
+    headers: ['Firma Adı', 'Proje Kodu', 'Proje İsmi', 'Tip', 'Malzeme / Ürün Adı', 'Malzeme Cinsi', 'Kalite', 'Açıklama', 'Miktar', 'Birim', 'Birim Fiyat', 'Tarih', 'Not'],
+    sample: ['Örnek Firma A.Ş.', 'PRJ-001', 'Örnek Proje', 'Giden (Hammadde)', 'Çelik Sac', 'Paslanmaz Çelik', '304', 'Açıklama örneği', 50, 'kg', 120, '2026-01-15', 'Not örneği'],
+  },
+  reminders: {
+    headers: ['Başlık', 'Tarih', 'Durum', 'İlişkili Proje Kodu', 'İlişkili Firma', 'Not'],
+    sample: ['Teslimat kontrolü', '2026-01-20', 'Bekliyor', 'PRJ-001', 'Örnek Firma A.Ş.', 'Not örneği'],
+  },
+};
+function downloadTemplate(type) {
+  if (typeof XLSX === 'undefined') { toast('Excel kütüphanesi yüklenemedi (internet gerekli)'); return; }
+  const t = EXCEL_TEMPLATES[type]; if (!t) return;
+  const ws = XLSX.utils.aoa_to_sheet([t.headers, t.sample]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Şablon');
+  XLSX.writeFile(wb, type + '-sablon.xlsx');
+  toast('Şablon indirildi');
 }
 
 function handleExcelImport(input) {
@@ -1252,85 +1311,90 @@ function importRemindersRows(rows) {
   persist(); render(); toast(added + ' hatırlatıcı eklendi');
 }
 
-/* ---------- Kullanıcı Yönetimi (sadece yönetici) ---------- */
-async function loadMembers() {
+/* ---------- Kullanıcı Yönetimi (sadece yönetici) — erişim kodları ---------- */
+function generateAccessCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // karıştırılabilir karakterler (I,O,0,1) çıkarıldı
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+async function loadAccessCodes() {
   try {
     const { db, collection, getDocs } = window.fb;
-    const snap = await getDocs(collection(db, 'workspaces', workspaceOwnerId, 'members'));
-    return snap.docs.map(d => ({ email: d.id, ...d.data() }));
+    const snap = await getDocs(collection(db, 'workspaces', workspaceOwnerId, 'codes'));
+    return snap.docs.map(d => ({ code: d.id, ...d.data() }));
   } catch (e) { console.error(e); return []; }
 }
-async function refreshMembers() { members = await loadMembers(); render(); }
-async function addMember() {
+async function refreshAccessCodes() { accessCodes = await loadAccessCodes(); render(); }
+async function createAccessCode() {
   if (userRole !== 'admin') return;
-  if (members.length >= 10) { toast('En fazla 10 kullanıcı ekleyebilirsiniz'); return; }
-  const input = document.getElementById('member_email');
-  const email = input.value.trim().toLowerCase();
-  if (!email || !email.includes('@')) { toast('Geçerli bir e-posta girin'); return; }
-  if (members.some(m => m.email === email)) { toast('Bu kullanıcı zaten ekli'); return; }
+  if (accessCodes.length >= 10) { toast('En fazla 10 kod oluşturabilirsiniz'); return; }
+  const code = generateAccessCode();
   try {
     const { db, doc, setDoc } = window.fb;
-    await setDoc(doc(db, 'workspaces', workspaceOwnerId, 'members', email), { role: 'viewer', addedAt: new Date().toISOString() });
-    input.value = '';
-    toast('Kullanıcı eklendi');
-    await refreshMembers();
-  } catch (e) { console.error(e); toast('Kullanıcı eklenemedi'); }
+    await setDoc(doc(db, 'codes', code), { ownerId: workspaceOwnerId, createdAt: new Date().toISOString() });
+    await setDoc(doc(db, 'workspaces', workspaceOwnerId, 'codes', code), { createdAt: new Date().toISOString() });
+    toast('Kod oluşturuldu: ' + code);
+    await refreshAccessCodes();
+  } catch (e) { console.error(e); toast('Kod oluşturulamadı'); }
 }
-async function removeMember(email) {
+async function revokeAccessCode(code) {
   if (userRole !== 'admin') return;
   try {
     const { db, doc, deleteDoc } = window.fb;
-    await deleteDoc(doc(db, 'workspaces', workspaceOwnerId, 'members', email));
-    toast('Kullanıcı kaldırıldı');
-    await refreshMembers();
-  } catch (e) { console.error(e); toast('Kullanıcı kaldırılamadı'); }
+    await deleteDoc(doc(db, 'codes', code));
+    await deleteDoc(doc(db, 'workspaces', workspaceOwnerId, 'codes', code));
+    toast('Kod iptal edildi');
+    await refreshAccessCodes();
+  } catch (e) { console.error(e); toast('Kod iptal edilemedi'); }
 }
-function copyWorkspaceCode() {
-  navigator.clipboard.writeText(workspaceOwnerId).then(() => toast('İşletme kodu kopyalandı')).catch(() => toast('Kopyalanamadı, kodu elle seçip kopyalayın'));
+function copyAccessCode(code) {
+  navigator.clipboard.writeText(code).then(() => toast('Kod kopyalandı')).catch(() => toast('Kopyalanamadı, kodu elle seçip kopyalayın'));
 }
 function renderUsersScreen() {
-  let out = `<div class="card">
-    <div style="font-weight:600;margin-bottom:4px">İşletme Kodunuz</div>
-    <div class="small muted" style="margin-bottom:10px">Görüntüleyici olarak eklemek istediğiniz kişiye bu kodu verin. Yeni kişi hesap oluşturup "Bir İşletmeye Katıl" seçeneğinde bu kodu girecek.</div>
-    <div style="display:flex;gap:8px">
-      <input readonly value="${esc(workspaceOwnerId)}" style="flex:1;border:1px solid var(--line);border-radius:7px;padding:9px 11px;font-size:13px;font-family:ui-monospace,monospace;background:var(--paper)">
-      <button class="btn-secondary" onclick="copyWorkspaceCode()">Kopyala</button>
-    </div>
-  </div>`;
-
-  out += `<div class="sect-label">Kullanıcılar (${members.length} / 10)</div>`;
+  let out = `<div class="sect-label" style="padding:0;margin-top:0">Erişim Kodları (${accessCodes.length} / 10)</div>`;
   out += `<div class="card" style="margin-bottom:14px">
-    <div class="field" style="margin-bottom:8px"><label>E-posta ile kullanıcı ekle (Görüntüleyici)</label>
-      <div style="display:flex;gap:8px">
-        <input id="member_email" type="email" placeholder="ornek@eposta.com" style="flex:1">
-        <button class="btn-primary" style="padding:9px 16px" onclick="addMember()">Ekle</button>
-      </div>
-    </div>
-    <div class="small muted">Eklediğiniz kişi, kendi e-posta adresiyle giriş yaptığında ve işletme kodunuzu girdiğinde verileri görüntüleyebilir — düzenleyemez.</div>
+    <div class="small muted" style="margin-bottom:10px">Her görüntüleyici için bir kod oluşturup kendilerine verin. Giriş ekranındaki "Görüntüleyici" sekmesinden bu kodla doğrudan girerler — hesap açmalarına gerek yok, sadece görüntüleyebilirler, düzenleyemezler.</div>
+    <button class="btn-primary" onclick="createAccessCode()">+ Yeni Kod Oluştur</button>
   </div>`;
-
   out += `<div class="stack">`;
-  if (members.length === 0) out += `<div class="empty">Henüz eklenmiş kullanıcı yok.</div>`;
-  members.forEach(m => {
+  if (accessCodes.length === 0) out += `<div class="empty">Henüz kod oluşturulmadı.</div>`;
+  accessCodes.forEach(c => {
     out += `<div class="card row">
-      <div><div style="font-size:14px;font-weight:500">${esc(m.email)}</div><div class="small muted">Görüntüleyici</div></div>
-      <button class="btn-link" style="color:var(--red)" onclick="removeMember('${esc(m.email)}')">Kaldır</button>
+      <div style="font-family:ui-monospace,monospace;font-size:17px;font-weight:700;letter-spacing:.06em">${esc(c.code)}</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-secondary" onclick="copyAccessCode('${c.code}')">Kopyala</button>
+        <button class="btn-link" style="color:var(--red)" onclick="revokeAccessCode('${c.code}')">İptal Et</button>
+      </div>
     </div>`;
   });
   out += `</div>`;
   return out;
 }
 
-/* ---------- Raporlar ---------- */
-function toggleCmm(id) {
+/* ---------- Raporlar / Kalite Kontrolü ---------- */
+const QC_STATUS = {
+  okeylendi: { label: 'Okeylendi', color: 'var(--green)', bg: '#EAF3EC' },
+  red: { label: 'Red', color: 'var(--red)', bg: '#F7ECE9' },
+  olcumde: { label: 'Ölçümde', color: 'var(--amber)', bg: '#FBF1E3' },
+};
+function setQualityStatus(id, status) {
   if (userRole !== 'admin') return;
   const j = jobById(id); if (!j) return;
-  j.cmmChecked = !j.cmmChecked;
-  persist(); render(); toast(j.cmmChecked ? 'CMM kontrolü işaretlendi' : 'CMM kontrolü kaldırıldı');
+  j.qualityStatus = (j.qualityStatus === status) ? '' : status; // tekrar tıklayınca temizle
+  persist(); render(); toast(j.qualityStatus ? 'Kalite kontrolü: ' + QC_STATUS[j.qualityStatus].label : 'Kalite kontrolü sıfırlandı');
+}
+function qcPills(j, size) {
+  const s = size === 'sm' ? 'padding:5px 10px;font-size:11px' : 'padding:8px;font-size:12px';
+  return Object.entries(QC_STATUS).map(([k, q]) => {
+    const active = j.qualityStatus === k;
+    const clickable = userRole === 'admin';
+    return `<button ${clickable ? `onclick="setQualityStatus('${j.id}','${k}')"` : 'disabled'} style="${s};border-radius:8px;border:none;font-weight:600;flex:1;cursor:${clickable?'pointer':'default'};background:${active?q.bg:'var(--paper)'};color:${active?q.color:'var(--muted)'};border:1px solid ${active?q.color:'var(--line)'}">${q.label}</button>`;
+  }).join('');
 }
 function renderReportsList() {
   const sorted = [...jobs].sort((a,b)=>(b.createdDate||'').localeCompare(a.createdDate||''));
-  let out = `<div class="small muted" style="margin-bottom:14px">Her iş için hammadde gönderim durumu (hareketlerden otomatik hesaplanır) ve CMM kalite kontrolü durumu.</div>`;
+  let out = `<div class="small muted" style="margin-bottom:14px">Her iş için hammadde gönderim durumu (hareketlerden otomatik hesaplanır) ve kalite kontrolü durumu.</div>`;
   out += `<div class="stack">`;
   if (sorted.length === 0) out += `<div class="empty">Henüz iş yok.</div>`;
   sorted.forEach(j => {
@@ -1344,14 +1408,11 @@ function renderReportsList() {
         </div>
         ${statusPill(j.status)}
       </div>
-      <div class="grid2" style="margin-top:10px">
-        <div class="small" style="padding:9px;border-radius:8px;text-align:center;font-weight:600;background:${hasGiden?'#EAF3EC':'#F7ECE9'};color:${hasGiden?'var(--green)':'var(--red)'}">
-          ${hasGiden ? '✓ Hammadde Gönderildi' : '✕ Hammadde Gönderilmedi'}
-        </div>
-        <button ${userRole!=='admin'?'disabled':''} onclick="toggleCmm('${j.id}')" class="small" style="padding:9px;border-radius:8px;border:none;text-align:center;font-weight:600;cursor:${userRole==='admin'?'pointer':'default'};background:${j.cmmChecked?'#EAF3EC':'#FBF1E3'};color:${j.cmmChecked?'var(--green)':'var(--amber)'}">
-          ${j.cmmChecked ? '✓ CMM Kontrolü Yapıldı' : '○ CMM Kontrolü Yapılmadı'}
-        </button>
+      <div class="small" style="margin-top:10px;padding:9px;border-radius:8px;text-align:center;font-weight:600;background:${hasGiden?'#EAF3EC':'#F7ECE9'};color:${hasGiden?'var(--green)':'var(--red)'}">
+        ${hasGiden ? '✓ Hammadde Gönderildi' : '✕ Hammadde Gönderilmedi'}
       </div>
+      <div class="small muted" style="margin-top:10px;margin-bottom:4px">Kalite Kontrolü</div>
+      <div style="display:flex;gap:6px">${qcPills(j)}</div>
     </div>`;
   });
   out += `</div>`;
@@ -1368,7 +1429,8 @@ function renderReportsList() {
   import {
     getAuth, onAuthStateChanged, signInWithEmailAndPassword,
     createUserWithEmailAndPassword, signOut,
-    GoogleAuthProvider, signInWithRedirect, getRedirectResult
+    GoogleAuthProvider, signInWithRedirect, getRedirectResult,
+    signInAnonymously
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
   import {
     getFirestore, doc, setDoc, getDoc, onSnapshot, enableIndexedDbPersistence,
@@ -1392,7 +1454,7 @@ function renderReportsList() {
   window.fb = {
     auth, db, doc, setDoc, getDoc, onSnapshot, collection, getDocs, deleteDoc,
     signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
-    GoogleAuthProvider, signInWithRedirect
+    GoogleAuthProvider, signInWithRedirect, signInAnonymously
   };
 
   getRedirectResult(auth).catch((e) => {
