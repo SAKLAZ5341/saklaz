@@ -481,6 +481,7 @@ function setTab(t) {
   ui.confirmDeleteCompany=false; ui.confirmDeleteJob=false; ui.confirmRow=null; ui.addingMultiMaterial=null;
   ui.editingMovementId=null; ui.editingReminderId=null;
   materialRows=[blankRow()]; materialFormDate=todayStr(); materialFormNote='';
+  jobRows=[blankJobRow()]; jobFormCompanyId='';
   pushHistory();
   render();
 }
@@ -686,13 +687,13 @@ function renderJobsList() {
   const filtered = ui.jobsCompanyFilter ? jobs.filter(j=>j.companyId===ui.jobsCompanyFilter) : jobs;
   const sorted = [...filtered].sort((a,b)=>(b.createdDate||'').localeCompare(a.createdDate||''));
   let out = `<div class="toolbar">`;
-  out += `<button class="btn-primary admin-only" ${companies.length===0?'disabled':''} onclick="ui.addingJob=true;render()">+ Yeni İş</button>`;
+  out += `<button class="btn-primary admin-only" ${companies.length===0?'disabled':''} onclick="openMultiJobForm()">+ Yeni İş</button>`;
   out += `<button class="btn-excel" onclick="exportJobs()">⬇ Excel'e Aktar</button>`;
   out += `<button class="btn-excel admin-only" onclick="triggerImport('jobs')">⬆ Excel'den Yükle</button>`;
   out += `<button class="btn-excel admin-only" onclick="downloadTemplate('jobs')">📄 Şablon İndir</button>`;
   out += `</div>`;
   if (companies.length===0) out += `<div class="small muted" style="margin-bottom:10px">İş eklemeden önce bir firma oluşturun.</div>`;
-  if (ui.addingJob) out += jobForm();
+  if (ui.addingJob) out += renderMultiJobForm();
   if (companies.length>0) {
     out += `<div class="filterbar"><select onchange="ui.jobsCompanyFilter=this.value;render()">
       <option value="">Tüm Firmalar</option>${companies.map(c=>`<option value="${c.id}" ${ui.jobsCompanyFilter===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>`;
@@ -708,6 +709,100 @@ function renderJobsList() {
   out += `</div>`;
   return out;
 }
+
+/* ---------- Çoklu iş (kalem) girişi ---------- */
+function blankJobRow() { return { projectCode:'', projectName:'', quantity:'', fee:'', drawingRef:'', description:'', status:'bekliyor', collapsed:false }; }
+let jobRows = [blankJobRow()];
+let jobFormCompanyId = '';
+
+function openMultiJobForm() {
+  ui.addingJob = true; jobRows = [blankJobRow()]; jobFormCompanyId = '';
+  render();
+}
+function addJobRow() {
+  const cur = jobRows[jobRows.length - 1];
+  if (!cur.projectName || !cur.projectName.trim()) { toast('Önce mevcut kalemin Proje İsmini girin'); return; }
+  cur.collapsed = true;
+  jobRows.push(blankJobRow());
+  render();
+}
+function removeJobRow(i) { if (jobRows.length > 1) { jobRows.splice(i, 1); render(); } }
+function toggleJobRowCollapse(i) { jobRows.forEach((r, idx) => { if (idx !== i) r.collapsed = true; }); jobRows[i].collapsed = false; render(); }
+function updateJobRow(i, field, val) { jobRows[i][field] = val; }
+function cancelMultiJob() { ui.addingJob = false; jobRows = [blankJobRow()]; jobFormCompanyId = ''; render(); }
+function submitMultiJob() {
+  const companyId = jobFormCompanyId || (document.getElementById('mj_companyId') ? document.getElementById('mj_companyId').value : '');
+  if (!companyId) { toast('Firma seçin'); return; }
+  let added = 0;
+  jobRows.forEach(row => {
+    if (!row.projectName || !row.projectName.trim()) return;
+    jobs.push({
+      id: uid(), companyId,
+      projectCode: row.projectCode, projectName: row.projectName,
+      quantity: row.quantity, fee: row.fee, drawingRef: row.drawingRef, description: row.description,
+      status: row.status || 'bekliyor', createdDate: todayStr(),
+    });
+    added++;
+  });
+  if (added === 0) { toast('En az bir kalem için Proje İsmi girin'); return; }
+  persist();
+  ui.addingJob = false; jobRows = [blankJobRow()]; jobFormCompanyId = '';
+  render(); toast(added + ' iş eklendi');
+}
+function jobRowHtml(row, i) {
+  if (row.collapsed) {
+    const label = row.projectCode ? (row.projectCode + ' · ' + (row.projectName || '')) : (row.projectName || ('Kalem ' + (i + 1)));
+    return `<div class="card" style="margin-bottom:8px">
+      <div class="row">
+        <button style="all:unset;cursor:pointer;flex:1" onclick="toggleJobRowCollapse(${i})">
+          <div style="font-size:14px;font-weight:500">${esc(label)}</div>
+          <div class="small muted" style="margin-top:2px">${row.quantity?row.quantity+' adet':''}${row.quantity&&row.fee?' · ':''}${row.fee?money(row.fee):''}</div>
+        </button>
+        <div style="display:flex;gap:10px">
+          <button class="btn-link" onclick="toggleJobRowCollapse(${i})">Düzenle</button>
+          ${jobRows.length>1?`<button class="btn-link" style="color:var(--red)" onclick="removeJobRow(${i})">Kaldır</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }
+  return `<div class="card" style="margin-bottom:8px">
+    <div class="row" style="margin-bottom:6px">
+      <span class="small muted" style="font-weight:600">Kalem ${i+1}</span>
+      ${jobRows.length>1?`<button class="btn-link" style="color:var(--red)" onclick="removeJobRow(${i})">Kaldır</button>`:''}
+    </div>
+    <div class="field"><label>Proje Kodu</label><input value="${esc(row.projectCode)}" oninput="updateJobRow(${i},'projectCode',this.value)"></div>
+    <div class="field"><label>Proje İsmi</label><input value="${esc(row.projectName)}" oninput="updateJobRow(${i},'projectName',this.value)"></div>
+    <div class="grid2">
+      <div class="field"><label>Adet / Miktar</label><input type="number" step="0.01" value="${esc(row.quantity)}" oninput="updateJobRow(${i},'quantity',this.value)"></div>
+      <div class="field"><label>Ücret (₺)</label><input type="number" step="0.01" value="${esc(row.fee)}" oninput="updateJobRow(${i},'fee',this.value)"></div>
+    </div>
+    <div class="field"><label>Teknik Resim Referansı</label><input value="${esc(row.drawingRef)}" oninput="updateJobRow(${i},'drawingRef',this.value)"></div>
+    <div class="field"><label>Açıklama</label><textarea rows="2" oninput="updateJobRow(${i},'description',this.value)">${esc(row.description)}</textarea></div>
+    <div class="field"><label>Durum</label><select onchange="updateJobRow(${i},'status',this.value)">
+      <option value="bekliyor" ${row.status==='bekliyor'?'selected':''}>Bekliyor</option>
+      <option value="uretimde" ${row.status==='uretimde'?'selected':''}>Üretimde</option>
+      <option value="tamamlandi" ${row.status==='tamamlandi'?'selected':''}>Tamamlandı</option>
+    </select></div>
+  </div>`;
+}
+function renderMultiJobForm() {
+  let out = `<div class="card" style="margin-bottom:12px">
+    <div class="field" style="margin-bottom:0"><label>Firma (bu kalemlerin tümü için)</label>
+      <select id="mj_companyId" onchange="jobFormCompanyId=this.value">
+        <option value="">Seçin…</option>
+        ${companies.map(c=>`<option value="${c.id}" ${jobFormCompanyId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}
+      </select>
+    </div>
+  </div>`;
+  jobRows.forEach((row, i) => out += jobRowHtml(row, i));
+  out += `<button class="btn-link" onclick="addJobRow()">+ Kalem Ekle</button>`;
+  out += `<div class="form-actions" style="margin-top:12px">
+    <button class="btn-primary" onclick="submitMultiJob()">Kalemleri Kaydet (${jobRows.length})</button>
+    <button class="btn-secondary" onclick="cancelMultiJob()">Vazgeç</button>
+  </div>`;
+  return out;
+}
+
 function jobForm(existing) {
   const j = existing || {};
   const companyOpts = companies.map(c=>`<option value="${c.id}" ${j.companyId===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
