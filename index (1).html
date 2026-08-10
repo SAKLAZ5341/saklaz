@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MetalERP — Çelik & Metal Talep Yönetimi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --sidebar:#101a2b;
+    --sidebar-hover:#1b2740;
+    --sidebar-active:#22314f;
+    --sidebar-text:#8ea0bd;
+    --sidebar-text-active:#ffffff;
+    --accent:#2f6feb;
+    --accent-dark:#1f52b8;
+    --accent-tint:#e8f0fe;
+    --bg:#f3f5f8;
+    --surface:#ffffff;
+    --line:#e2e6ec;
+    --ink:#141b28;
+    --muted:#5b6879;
+    --muted-2:#8b95a3;
+    --danger:#d64545;
+    --danger-tint:#fbeaea;
+    --ok:#1f9d55;
+    --ok-tint:#e6f6ec;
+    --radius:8px;
+    --font: 'Inter', -apple-system, sans-serif;
+    --mono: 'Roboto Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:var(--font);
+    background:var(--bg);
+    color:var(--ink);
+    min-height:100vh;
+  }
+  #appRoot{display:flex;min-height:100vh;}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:230px;
+    flex-shrink:0;
+    background:var(--sidebar);
+    display:flex;
+    flex-direction:column;
+    position:sticky;
+    top:0;
+    height:100vh;
+  }
+  .sidebar .brand{
+    padding:20px 18px 16px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    border-bottom:1px solid rgba(255,255,255,0.08);
+  }
+  .sidebar .brand .mark{
+    width:32px;height:32px;border-radius:7px;
+    background:var(--accent);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;color:#fff;font-size:14px;flex-shrink:0;
+  }
+  .sidebar .brand .name{color:#fff;font-weight:600;font-size:14.5px;line-height:1.2;}
+  .sidebar .brand .sub{color:var(--sidebar-text);font-size:11px;margin-top:1px;}
+  .nav{padding:12px 10px;flex:1;overflow-y:auto;}
+  .nav .group-label{
+    font-size:10.5px;text-transform:uppercase;letter-spacing:0.6px;
+    color:#5c6c85;padding:14px 10px 6px;font-weight:600;
+  }
+  .nav button{
+    width:100%;
+    display:flex;align-items:center;gap:10px;
+    background:none;border:none;
+    color:var(--sidebar-text);
+    padding:9px 10px;
+    border-radius:7px;
+    font-family:var(--font);
+    font-size:13.5px;
+    font-weight:500;
+    cursor:pointer;
+    text-align:left;
+    margin-bottom:2px;
+    transition:background .12s, color .12s;
+  }
+  .nav button svg{width:17px;height:17px;flex-shrink:0;}
+  .nav button:hover{background:var(--sidebar-hover);color:#fff;}
+  .nav button.active{background:var(--sidebar-active);color:var(--sidebar-text-active);}
+  .nav button .count{
+    margin-left:auto;font-family:var(--mono);font-size:11px;
+    background:rgba(255,255,255,0.08);padding:1px 7px;border-radius:20px;color:#c4cede;
+  }
+  .sidebar .foot{
+    padding:12px 18px 16px;border-top:1px solid rgba(255,255,255,0.08);
+    color:#5c6c85;font-size:11px;
+  }
+
+  /* ---------- Main ---------- */
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .topbar{
+    height:58px;flex-shrink:0;
+    background:var(--surface);
+    border-bottom:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 24px;
+    position:sticky;top:0;z-index:5;
+  }
+  .topbar h2{font-size:16px;font-weight:600;margin:0;}
+  .topbar .meta{font-size:12px;color:var(--muted-2);}
+  .content{padding:24px;max-width:1180px;width:100%;margin:0 auto;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* ---------- Cards / general ---------- */
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:20px;
+    margin-bottom:16px;
+  }
+  .card-title{font-size:13px;font-weight:600;color:var(--ink);margin:0 0 14px;display:flex;align-items:center;justify-content:space-between;}
+  .card-title .hint{font-size:11.5px;color:var(--muted-2);font-weight:400;}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px;}
+  .kpi{
+    background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:16px 18px;
+  }
+  .kpi .lbl{font-size:11.5px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.4px;}
+  .kpi .val{font-family:var(--mono);font-size:22px;font-weight:500;margin-top:6px;}
+  .kpi.accent{background:var(--accent-tint);border-color:#c9dcfb;}
+  .kpi.accent .val{color:var(--accent-dark);}
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    padding:9px 15px;border-radius:7px;border:1px solid var(--line);
+    background:var(--surface);color:var(--ink);
+    font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;
+  }
+  .btn:hover{border-color:#c3cad4;background:#fafbfc;}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn.primary:hover{background:var(--accent-dark);}
+  .btn.danger:hover{border-color:var(--danger);color:var(--danger);}
+  .btn.block{width:100%;}
+  .btn.sm{padding:6px 10px;font-size:12px;}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;}
+
+  /* ---------- Forms ---------- */
+  .field-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:12px;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:12px;color:var(--muted);font-weight:500;}
+  .field .hintline{font-size:10.5px;color:var(--muted-2);}
+  .field input, .field select{
+    height:36px;border:1px solid var(--line);border-radius:7px;padding:0 10px;
+    font-family:var(--mono);font-size:13.5px;background:#fff;color:var(--ink);
+  }
+  .field input:focus, .field select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-tint);}
+
+  .pill-tabs{display:grid;gap:8px;margin-bottom:16px;}
+  .pill-tabs.cols-4{grid-template-columns:repeat(4,1fr);}
+  .pill-tabs button{
+    font-family:var(--font);font-size:13px;font-weight:500;
+    padding:10px 6px;border-radius:7px;border:1px solid var(--line);
+    background:var(--bg);color:var(--muted);cursor:pointer;transition:all .12s;
+  }
+  .pill-tabs button.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+  .pill-tabs button.mat.active{background:var(--accent);border-color:var(--accent);}
+  .pill-tabs button:hover:not(.active){border-color:#c3cad4;}
+
+  .preview-box{
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--bg);border:1px dashed var(--line);border-radius:8px;
+    padding:12px 16px;margin:14px 0;font-family:var(--mono);font-size:13px;color:var(--muted);flex-wrap:wrap;gap:8px;
+  }
+  .preview-box b{color:var(--ink);font-size:15px;}
+
+  /* ---------- Table ---------- */
+  .table-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{
+    text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.4px;
+    color:var(--muted-2);border-bottom:1.5px solid var(--ink);padding:9px 8px;white-space:nowrap;
+  }
+  tbody td{padding:9px 8px;border-bottom:1px solid var(--line);font-family:var(--mono);}
+  tbody tr:hover{background:var(--bg);}
+  .num{text-align:right;white-space:nowrap;}
+  .tag{
+    display:inline-block;font-family:var(--font);font-size:11px;font-weight:500;
+    padding:2px 8px;border-radius:20px;background:var(--accent-tint);color:var(--accent-dark);
+  }
+  .del{background:none;border:none;color:var(--muted-2);cursor:pointer;font-size:15px;padding:4px;}
+  .del:hover{color:var(--danger);}
+  .empty{padding:36px;text-align:center;color:var(--muted-2);font-size:13px;}
+
+  .filter-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .filter-row input, .filter-row select{
+    height:34px;border:1px solid var(--line);border-radius:7px;padding:0 10px;
+    font-family:var(--font);font-size:12.5px;background:#fff;
+  }
+
+  .toast{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;
+    font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;
+    max-width:90vw;text-align:center;z-index:999;
+  }
+  .toast.show{opacity:1;}
+
+  .empty-state{
+    text-align:center;padding:50px 20px;color:var(--muted-2);
+  }
+  .empty-state svg{width:44px;height:44px;margin-bottom:10px;opacity:0.5;}
+  .empty-state p{margin:0 0 14px;font-size:13.5px;}
+
+  .sync-dot{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-2);}
+  .sync-dot .d{width:7px;height:7px;border-radius:50%;background:var(--muted-2);}
+  .sync-dot.ok .d{background:var(--ok);}
+  .sync-dot.err .d{background:var(--danger);}
+  .setup-screen{
+    max-width:520px;margin:60px auto;background:var(--surface);border:1px solid var(--line);
+    border-radius:10px;padding:28px;
+  }
+  .setup-screen h3{margin:0 0 8px;font-size:16px;}
+  .setup-screen p{font-size:13px;color:var(--muted);line-height:1.6;}
+  .setup-screen textarea{
+    width:100%;min-height:140px;font-family:var(--mono);font-size:12.5px;
+    border:1px solid var(--line);border-radius:7px;padding:10px;margin:10px 0;
+  }
+
+  @media(max-width:900px){
+    .sidebar{width:64px;}
+    .sidebar .brand .name, .sidebar .brand .sub, .nav button span, .nav .group-label, .nav button .count, .sidebar .foot{display:none;}
+    .sidebar .brand{justify-content:center;}
+    .nav button{justify-content:center;}
+    .kpi-grid{grid-template-columns:repeat(2,1fr);}
+    .pill-tabs.cols-4{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<div class="setup-screen" id="setupScreen" style="display:none;">
+  <h3>Firebase bağlantısı gerekli</h3>
+  <p>Firebase Console'da oluşturduğunuz web uygulamasının <b>firebaseConfig</b> kod bloğunun tamamını aşağıya yapıştırın (<code>const firebaseConfig = { ... }</code> satırlarıyla birlikte kopyalayabilirsiniz).</p>
+  <textarea id="configInput" placeholder="const firebaseConfig = {
+  apiKey: &quot;...&quot;,
+  authDomain: &quot;...&quot;,
+  projectId: &quot;...&quot;,
+  ...
+};"></textarea>
+  <button class="btn primary block" id="configSaveBtn">Bağlan ve Kaydet</button>
+  <p style="font-size:11.5px;color:var(--muted-2);margin-top:10px;">Bu bilgi sadece bu dosyanın içine, bu tarayıcıya kaydedilir; her cihazda index.html içinde sabit olarak durması için GitHub'a yüklemeden önce dosyayı elle düzenlemeniz gerekecek — talimatı sohbette bulabilirsiniz.</p>
+</div>
+
+<div id="appRoot" style="display:none;">
+<div class="sidebar">
+  <div class="brand">
+    <div class="mark">M</div>
+    <div>
+      <div class="name">MetalERP</div>
+      <div class="sub">Satınalma Modülü</div>
+    </div>
+  </div>
+  <div class="nav">
+    <div class="group-label">Genel</div>
+    <button data-view="dashboard" class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+      <span>Pano</span>
+    </button>
+    <button data-view="new">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span>Yeni Kayıt</span>
+    </button>
+    <button data-view="list">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      <span>Talep Listesi</span>
+      <span class="count" id="navListCount">0</span>
+    </button>
+    <div class="group-label">Yönetim</div>
+    <button data-view="materials">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 22V12"/><path d="M20 6.5L12 12l-8-5.5"/></svg>
+      <span>Malzemeler</span>
+    </button>
+    <button data-view="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span>Ayarlar</span>
+    </button>
+  </div>
+  <div class="foot">MetalERP v0.1 &middot; yerel veri</div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <h2 id="viewTitle">Pano</h2>
+    <div class="sync-dot" id="syncStatus"><span class="d"></span><span id="syncLabel">Bağlanıyor...</span></div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="view active" id="view-dashboard">
+      <div class="kpi-grid">
+        <div class="kpi"><div class="lbl">Toplam Kayıt</div><div class="val" id="kpiCount">0</div></div>
+        <div class="kpi"><div class="lbl">Toplam Ağırlık</div><div class="val" id="kpiKg">0 kg</div></div>
+        <div class="kpi accent"><div class="lbl">Toplam Tutar</div><div class="val" id="kpiTutar">0 TL</div></div>
+        <div class="kpi"><div class="lbl">Bu Ay Eklenen</div><div class="val" id="kpiMonth">0</div></div>
+      </div>
+
+      <div class="card">
+        <p class="card-title">Son Eklenen Kayıtlar <span class="hint">son 8 kayıt</span></p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Talep</th><th>Malzeme</th><th>Tür</th><th>Ölçü</th><th class="num">Kg</th><th class="num">Tutar</th><th>Tarih</th></tr></thead>
+            <tbody id="dashRecent"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn primary" onclick="goView('new')">+ Yeni Kayıt Ekle</button>
+        <button class="btn" onclick="goView('list')">Tüm Listeyi Görüntüle</button>
+      </div>
+    </div>
+
+    <!-- NEW RECORD -->
+    <div class="view" id="view-new">
+      <div class="card">
+        <p class="card-title">Talep Bilgisi</p>
+        <div class="field-row">
+          <div class="field">
+            <label for="reqName">Talep / Proje No</label>
+            <input id="reqName" type="text" placeholder="Örn: ARC-2026-014">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="card-title">1. Malzeme</p>
+        <div class="pill-tabs cols-4" id="matTabs"></div>
+
+        <p class="card-title">2. Kesit Türü</p>
+        <div class="pill-tabs cols-4" id="typeTabs">
+          <button data-type="mil" class="active">Mil (Yuvarlak)</button>
+          <button data-type="kare">Kare</button>
+          <button data-type="lama">Lama</button>
+          <button data-type="boru">Boru</button>
+        </div>
+
+        <div class="field-row" id="dimFields"></div>
+
+        <div class="field-row">
+          <div class="field"><label for="boy">Boy (m)</label><input id="boy" type="number" step="0.01" value="6" min="0"></div>
+          <div class="field"><label for="adet">Adet</label><input id="adet" type="number" step="1" value="1" min="1"></div>
+          <div class="field"><label for="fiyat">Birim Fiyat (TL/kg)</label><input id="fiyat" type="number" step="0.01" placeholder="opsiyonel"></div>
+          <div class="field">
+            <label for="yogunluk">Yoğunluk (g/cm³)</label>
+            <input id="yogunluk" type="number" step="0.001" value="7.85">
+            <span class="hintline">Malzemeye göre otomatik dolar, gerekirse düzenleyin</span>
+          </div>
+        </div>
+
+        <div class="preview-box">
+          Parça ağırlığı: <b id="pvUnit">–</b> kg &nbsp;·&nbsp; Toplam: <b id="pvTotal">–</b> kg
+        </div>
+
+        <button class="btn primary block" id="addBtn">Listeye Ekle</button>
+      </div>
+    </div>
+
+    <!-- LIST -->
+    <div class="view" id="view-list">
+      <div class="card">
+        <p class="card-title">Excel İşlemleri</p>
+        <div class="btn-row">
+          <label class="btn" for="fileInput" style="cursor:pointer;">Excelden İçeri Al</label>
+          <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none;">
+          <button class="btn" id="templateBtn">Şablon İndir</button>
+          <button class="btn primary" id="exportBtn">Excele Aktar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="card-title">Talep Listesi</p>
+        <div class="filter-row">
+          <input type="text" id="filterSearch" placeholder="Talep no, malzeme veya ölçü ara...">
+          <select id="filterType">
+            <option value="">Tüm Türler</option>
+            <option value="mil">Mil</option>
+            <option value="kare">Kare</option>
+            <option value="lama">Lama</option>
+            <option value="boru">Boru</option>
+          </select>
+          <select id="filterMat"></select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Talep</th><th>Malzeme</th><th>Tür</th><th>Ölçü</th>
+                <th class="num">Boy</th><th class="num">Adet</th>
+                <th class="num">Birim Kg</th><th class="num">Toplam Kg</th>
+                <th class="num">TL/Kg</th><th class="num">Tutar</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="listRows"></tbody>
+          </table>
+        </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-top:16px;">
+          <div class="kpi"><div class="lbl">Görüntülenen Kayıt</div><div class="val" id="listCount">0</div></div>
+          <div class="kpi"><div class="lbl">Toplam Ağırlık</div><div class="val" id="listKg">0 kg</div></div>
+          <div class="kpi accent"><div class="lbl">Toplam Tutar</div><div class="val" id="listTutar">0 TL</div></div>
+        </div>
+        <div class="btn-row" style="margin-top:14px;">
+          <button class="btn" id="copyBtn">Metin Olarak Kopyala</button>
+          <button class="btn danger" id="clearBtn">Tüm Listeyi Temizle</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MATERIALS -->
+    <div class="view" id="view-materials">
+      <div class="card">
+        <p class="card-title">Malzeme Tanımları <span class="hint">Yoğunluk g/cm³ cinsindendir</span></p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Malzeme Adı</th><th class="num">Yoğunluk (g/cm³)</th><th></th></tr></thead>
+            <tbody id="matRows"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <p class="card-title">Yeni Malzeme Ekle</p>
+        <div class="field-row">
+          <div class="field"><label for="newMatName">Malzeme Adı</label><input id="newMatName" type="text" placeholder="Örn: Pirinç"></div>
+          <div class="field"><label for="newMatDensity">Yoğunluk (g/cm³)</label><input id="newMatDensity" type="number" step="0.001" placeholder="Örn: 8.40"></div>
+        </div>
+        <button class="btn primary" id="addMatBtn">Malzeme Ekle</button>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="view" id="view-settings">
+      <div class="card">
+        <p class="card-title">Firma Bilgisi</p>
+        <div class="field-row">
+          <div class="field"><label for="companyName">Firma Adı</label><input id="companyName" type="text" placeholder="Excel çıktılarında başlık olarak kullanılır"></div>
+        </div>
+      </div>
+      <div class="card">
+        <p class="card-title">Veri Yönetimi</p>
+        <div class="btn-row">
+          <button class="btn danger" id="resetBtn">Tüm Verileri Sıfırla</button>
+        </div>
+        <p class="hintline" style="margin-top:10px;">Veriler Firebase üzerinde saklanır, aynı linke giren herkes aynı listeyi görür. Sıfırlama işlemi geri alınamaz.</p>
+      </div>
+      <div class="card">
+        <p class="card-title">Dağıtım (GitHub'a Yükleme)</p>
+        <p class="hintline">Bu sekmedeki bağlantı bilgileriyle, GitHub'daki index.html'in üzerine yazacağınız hazır dosyayı indirin.</p>
+        <div class="btn-row" style="margin-top:10px;">
+          <button class="btn primary" id="downloadConfigBtn">Yapılandırılmış index.html İndir</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= State ================= */
+const DEFAULT_MATERIALS = {
+  celik:      {label:'Çelik',      density:7.85},
+  paslanmaz:  {label:'Paslanmaz',  density:7.90},
+  bronz:      {label:'Bronz',      density:8.80},
+  kestamid:   {label:'Kestamid',   density:1.15}
+};
+const dimFieldsByType = {
+  mil:  [{id:'cap', label:'Çap (mm)', value:20}],
+  kare: [{id:'kenar', label:'Kenar (mm)', value:20}],
+  lama: [{id:'kalinlik', label:'Kalınlık (mm)', value:10},{id:'genislik', label:'Genişlik (mm)', value:50}],
+  boru: [{id:'disCap', label:'Dış Çap (mm)', value:33.7},{id:'etKalinligi', label:'Et Kalınlığı (mm)', value:3.2}]
+};
+const typeLabels = {mil:'Mil', kare:'Kare', lama:'Lama', boru:'Boru'};
+
+let state = {
+  materials: JSON.parse(JSON.stringify(DEFAULT_MATERIALS)),
+  items: [],
+  company: ''
+};
+let currentType = 'mil';
+let currentMat = 'celik';
+
+/* ---------- Firebase bağlantısı ----------
+   Bu dosyayı GitHub'a yüklemeden önce aşağıdaki değerleri kendi Firebase
+   projenizin bilgileriyle değiştirin (Firebase Console > Project settings
+   > Your apps > SDK setup and configuration). Değiştirmezseniz uygulama
+   ekranda bir kurulum formu gösterir ve orada test edip hazır dosyayı
+   indirebilirsiniz. */
+const FIREBASE_CONFIG = /*FC_START*/{
+  apiKey: "AIzaSyCV1HY4b6BWH8fg03Vrd5NgMLLWrvMEoIw",
+  authDomain: "saklaz-f1287.firebaseapp.com",
+  projectId: "saklaz-f1287",
+  storageBucket: "saklaz-f1287.firebasestorage.app",
+  messagingSenderId: "708542271677",
+  appId: "1:708542271677:web:50aaf868478a2ce68f67d4"
+}/*FC_END*/;
+
+let activeConfig = FIREBASE_CONFIG;
+let db = null;
+
+function isConfigured(cfg){
+  return !!(cfg && cfg.apiKey && cfg.apiKey !== 'YOUR_API_KEY' && cfg.projectId && cfg.projectId !== 'YOUR_PROJECT');
+}
+function setSyncStatus(status, label){
+  document.getElementById('syncStatus').className = 'sync-dot ' + status;
+  document.getElementById('syncLabel').textContent = label;
+}
+function initFirebase(config){
+  try{
+    if(!firebase.apps.length) firebase.initializeApp(config);
+    db = firebase.firestore();
+    return true;
+  }catch(e){ return false; }
+}
+function startSync(){
+  setSyncStatus('', 'Bağlanıyor...');
+  db.collection('metalerp').doc('shared-data').onSnapshot(doc=>{
+    if(doc.exists){
+      const data = doc.data();
+      state.materials = data.materials || state.materials;
+      state.items = data.items || [];
+      state.company = data.company || '';
+      document.getElementById('companyName').value = state.company;
+      renderAll();
+    } else {
+      db.collection('metalerp').doc('shared-data').set(state);
+    }
+    setSyncStatus('ok', 'Senkronize');
+  }, err=>{
+    setSyncStatus('err', 'Bağlantı hatası');
+  });
+}
+async function saveState(){
+  if(!db){ return; }
+  try{
+    await db.collection('metalerp').doc('shared-data').set(state);
+  }catch(e){
+    setSyncStatus('err', 'Kaydedilemedi');
+    showToast('Veri kaydedilemedi, internet bağlantınızı kontrol edin.');
+  }
+}
+function downloadConfiguredFile(){
+  const marker = /\/\*FC_START\*\/[\s\S]*?\/\*FC_END\*\//;
+  if(!marker.test(document.documentElement.outerHTML)){
+    showToast('Dosya yapısı beklenmedik, indirme yapılamadı.');
+    return;
+  }
+  const configStr = JSON.stringify(activeConfig, null, 2);
+  const finalHtml = '<!DOCTYPE html>\n' + document.documentElement.outerHTML.replace(marker, configStr);
+  const blob = new Blob([finalHtml], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'index.html'; a.click();
+  URL.revokeObjectURL(url);
+  showToast('index.html indirildi. GitHub\'da "Add file > Upload files" ile üzerine yükleyin.');
+}
+document.getElementById('configSaveBtn').addEventListener('click', ()=>{
+  const raw = document.getElementById('configInput').value;
+  const match = raw.match(/{[\s\S]*}/);
+  if(!match){ alert('firebaseConfig bloğunun tamamını yapıştırdığınızdan emin olun.'); return; }
+  let obj;
+  try{
+    obj = Function('"use strict"; return (' + match[0] + ')')();
+  }catch(e){
+    alert('Yapıştırılan metin okunamadı, tekrar kontrol edin.');
+    return;
+  }
+  activeConfig = obj;
+  if(initFirebase(activeConfig)){
+    document.getElementById('setupScreen').style.display = 'none';
+    document.getElementById('appRoot').style.display = 'flex';
+    startSync();
+    showToast('Bağlantı kuruldu. Ayarlar > Dağıtım bölümünden hazır dosyayı indirin.');
+  } else {
+    alert('Bağlantı kurulamadı, config bilgilerini kontrol edin.');
+  }
+});
+document.getElementById('downloadConfigBtn')?.addEventListener('click', downloadConfiguredFile);
+
+/* ================= Navigation ================= */
+const viewTitles = {dashboard:'Pano', new:'Yeni Kayıt', list:'Talep Listesi', materials:'Malzemeler', settings:'Ayarlar'};
+document.querySelectorAll('.nav button').forEach(btn=>{
+  btn.addEventListener('click', ()=>goView(btn.dataset.view));
+});
+function goView(name){
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.getElementById('viewTitle').textContent = viewTitles[name];
+  if(name==='list') renderList();
+  if(name==='materials') renderMaterials();
+  if(name==='dashboard') renderDashboard();
+}
+
+/* ================= Calculation core ================= */
+function areaMm2(type, dims){
+  if(type==='mil') return (Math.PI/4) * Math.pow(dims.cap,2);
+  if(type==='kare') return Math.pow(dims.kenar,2);
+  if(type==='lama') return dims.kalinlik * dims.genislik;
+  if(type==='boru'){ const s=dims.etKalinligi, D=dims.disCap; return Math.PI * s * (D - s); }
+  return 0;
+}
+function kgPerMeter(type, dims, density){ return areaMm2(type, dims) * density * 0.001; }
+function dimLabel(type, dims){
+  if(type==='mil') return `Ø${dims.cap} mm`;
+  if(type==='kare') return `${dims.kenar}x${dims.kenar} mm`;
+  if(type==='lama') return `${dims.kalinlik}x${dims.genislik} mm`;
+  if(type==='boru') return `Ø${dims.disCap} x ${dims.etKalinligi} mm`;
+}
+function fmt(n, dec=2){ return new Intl.NumberFormat('tr-TR',{minimumFractionDigits:dec,maximumFractionDigits:dec}).format(n||0); }
+
+/* ================= New Record view ================= */
+const dimFieldsEl = document.getElementById('dimFields');
+const matTabsEl = document.getElementById('matTabs');
+const typeTabsEl = document.getElementById('typeTabs');
+const yogunlukInput = document.getElementById('yogunluk');
+
+function renderMatTabs(){
+  matTabsEl.innerHTML = '';
+  Object.keys(state.materials).forEach(key=>{
+    const b = document.createElement('button');
+    b.className = 'mat' + (key===currentMat ? ' active':'');
+    b.textContent = state.materials[key].label;
+    b.dataset.mat = key;
+    b.addEventListener('click', ()=>{
+      currentMat = key;
+      renderMatTabs();
+      yogunlukInput.value = state.materials[key].density;
+      updatePreview();
+    });
+    matTabsEl.appendChild(b);
+  });
+}
+function renderDimFields(){
+  dimFieldsEl.innerHTML = '';
+  dimFieldsByType[currentType].forEach(f=>{
+    const div = document.createElement('div');
+    div.className='field';
+    div.innerHTML = `<label for="${f.id}">${f.label}</label><input id="${f.id}" type="number" step="0.1" value="${f.value}" min="0">`;
+    dimFieldsEl.appendChild(div);
+  });
+  dimFieldsEl.querySelectorAll('input').forEach(i=>i.addEventListener('input', updatePreview));
+  updatePreview();
+}
+function getDims(){
+  const dims = {};
+  dimFieldsByType[currentType].forEach(f=>{ dims[f.id] = parseFloat(document.getElementById(f.id).value) || 0; });
+  return dims;
+}
+typeTabsEl.querySelectorAll('button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    typeTabsEl.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentType = btn.dataset.type;
+    renderDimFields();
+  });
+});
+['boy','adet','yogunluk'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', updatePreview);
+});
+function updatePreview(){
+  const dims = getDims();
+  const boy = parseFloat(document.getElementById('boy').value) || 0;
+  const adet = parseFloat(document.getElementById('adet').value) || 0;
+  const density = parseFloat(yogunlukInput.value) || 0;
+  const perM = kgPerMeter(currentType, dims, density);
+  const unitKg = perM * boy;
+  const totalKg = unitKg * adet;
+  document.getElementById('pvUnit').textContent = unitKg>0 ? unitKg.toFixed(3) : '–';
+  document.getElementById('pvTotal').textContent = totalKg>0 ? totalKg.toFixed(3) : '–';
+}
+document.getElementById('addBtn').addEventListener('click', ()=>{
+  const dims = getDims();
+  const boy = parseFloat(document.getElementById('boy').value) || 0;
+  const adet = parseFloat(document.getElementById('adet').value) || 0;
+  const fiyat = parseFloat(document.getElementById('fiyat').value) || 0;
+  const density = parseFloat(yogunlukInput.value) || 0;
+  const reqName = document.getElementById('reqName').value.trim();
+  if(boy<=0 || adet<=0 || density<=0){ showToast('Boy, adet ve yoğunluk değerlerini kontrol edin.'); return; }
+  addItem({reqName, type:currentType, mat:currentMat, dims, boy, adet, fiyat, density});
+  showToast('Kayıt eklendi.');
+  saveState();
+  renderAll();
+});
+function addItem({reqName, type, mat, dims, boy, adet, fiyat, density}){
+  const perM = kgPerMeter(type, dims, density);
+  const unitKg = perM * boy;
+  const totalKg = unitKg * adet;
+  const tutar = fiyat ? totalKg * fiyat : 0;
+  state.items.push({
+    id: Date.now() + Math.random().toString(16).slice(2),
+    reqName: reqName || '–',
+    type, mat,
+    matLabel: state.materials[mat] ? state.materials[mat].label : mat,
+    dimLabel: dimLabel(type, dims),
+    boy, adet, unitKg, totalKg, density,
+    fiyat: fiyat || null, tutar,
+    date: new Date().toISOString()
+  });
+}
+
+/* ================= Dashboard ================= */
+function renderDashboard(){
+  const items = state.items;
+  const totKg = items.reduce((s,i)=>s+i.totalKg,0);
+  const totTutar = items.reduce((s,i)=>s+(i.tutar||0),0);
+  const now = new Date();
+  const thisMonth = items.filter(i=>{
+    const d = new Date(i.date);
+    return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+  }).length;
+  document.getElementById('kpiCount').textContent = items.length;
+  document.getElementById('kpiKg').textContent = fmt(totKg,2)+' kg';
+  document.getElementById('kpiTutar').textContent = fmt(totTutar,2)+' TL';
+  document.getElementById('kpiMonth').textContent = thisMonth;
+
+  const recent = [...items].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,8);
+  const tbody = document.getElementById('dashRecent');
+  if(recent.length===0){
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Henüz kayıt yok.</td></tr>';
+  } else {
+    tbody.innerHTML = recent.map(it=>`
+      <tr>
+        <td><span class="tag">${it.reqName}</span></td>
+        <td>${it.matLabel}</td>
+        <td>${typeLabels[it.type]}</td>
+        <td>${it.dimLabel}</td>
+        <td class="num">${fmt(it.totalKg,3)}</td>
+        <td class="num">${it.tutar ? fmt(it.tutar,2)+' TL' : '–'}</td>
+        <td>${new Date(it.date).toLocaleDateString('tr-TR')}</td>
+      </tr>`).join('');
+  }
+  document.getElementById('navListCount').textContent = items.length;
+}
+
+/* ================= List view ================= */
+function populateFilterMat(){
+  const sel = document.getElementById('filterMat');
+  sel.innerHTML = '<option value="">Tüm Malzemeler</option>' +
+    Object.keys(state.materials).map(k=>`<option value="${k}">${state.materials[k].label}</option>`).join('');
+}
+['filterSearch','filterType','filterMat'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', renderList);
+});
+function renderList(){
+  const search = document.getElementById('filterSearch').value.trim().toLocaleLowerCase('tr-TR');
+  const fType = document.getElementById('filterType').value;
+  const fMat = document.getElementById('filterMat').value;
+
+  let filtered = state.items.filter(it=>{
+    if(fType && it.type!==fType) return false;
+    if(fMat && it.mat!==fMat) return false;
+    if(search){
+      const hay = `${it.reqName} ${it.matLabel} ${it.dimLabel}`.toLocaleLowerCase('tr-TR');
+      if(!hay.includes(search)) return false;
+    }
+    return true;
+  }).sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  const tbody = document.getElementById('listRows');
+  if(filtered.length===0){
+    tbody.innerHTML = '<tr><td colspan="11" class="empty">Kayıt bulunamadı.</td></tr>';
+  } else {
+    tbody.innerHTML = filtered.map(it=>`
+      <tr>
+        <td><span class="tag">${it.reqName}</span></td>
+        <td>${it.matLabel}</td>
+        <td>${typeLabels[it.type]}</td>
+        <td>${it.dimLabel}</td>
+        <td class="num">${fmt(it.boy,2)} m</td>
+        <td class="num">${it.adet}</td>
+        <td class="num">${fmt(it.unitKg,3)}</td>
+        <td class="num">${fmt(it.totalKg,3)}</td>
+        <td class="num">${it.fiyat ? fmt(it.fiyat,2) : '–'}</td>
+        <td class="num">${it.fiyat ? fmt(it.tutar,2)+' TL' : '–'}</td>
+        <td><button class="del" data-id="${it.id}" title="Sil">✕</button></td>
+      </tr>`).join('');
+    tbody.querySelectorAll('.del').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        state.items = state.items.filter(i=>i.id!==b.dataset.id);
+        saveState(); renderAll();
+      });
+    });
+  }
+  document.getElementById('listCount').textContent = filtered.length;
+  document.getElementById('listKg').textContent = fmt(filtered.reduce((s,i)=>s+i.totalKg,0),2)+' kg';
+  document.getElementById('listTutar').textContent = fmt(filtered.reduce((s,i)=>s+(i.tutar||0),0),2)+' TL';
+}
+document.getElementById('clearBtn').addEventListener('click', ()=>{
+  if(state.items.length===0) return;
+  if(confirm('Tüm talep listesi silinsin mi? Bu işlem geri alınamaz.')){
+    state.items = [];
+    saveState(); renderAll();
+  }
+});
+document.getElementById('copyBtn').addEventListener('click', ()=>{
+  if(state.items.length===0){ showToast('Liste boş.'); return; }
+  let text = (state.company ? state.company+'\n' : '') + 'Çelik / Metal Talep Listesi\n' + '-'.repeat(55) + '\n';
+  state.items.forEach((it,i)=>{
+    text += `${i+1}. [${it.reqName}] ${it.matLabel} ${typeLabels[it.type]} ${it.dimLabel} — Boy: ${fmt(it.boy,2)}m x ${it.adet} adet = ${fmt(it.totalKg,3)} kg`;
+    if(it.fiyat) text += ` — ${fmt(it.fiyat,2)} TL/kg = ${fmt(it.tutar,2)} TL`;
+    text += '\n';
+  });
+  const totKg = state.items.reduce((s,i)=>s+i.totalKg,0);
+  const totTutar = state.items.reduce((s,i)=>s+(i.tutar||0),0);
+  text += '-'.repeat(55) + `\nTOPLAM AĞIRLIK: ${fmt(totKg,2)} kg\n`;
+  if(totTutar>0) text += `TOPLAM TUTAR: ${fmt(totTutar,2)} TL\n`;
+  navigator.clipboard.writeText(text).then(()=>showToast('Liste panoya kopyalandı.')).catch(()=>showToast('Kopyalama başarısız.'));
+});
+
+/* ================= Excel ================= */
+document.getElementById('templateBtn').addEventListener('click', ()=>{
+  const header = ['Talep No','Tür','Malzeme','Ölçü1 (mm)','Ölçü2 (mm)','Boy (m)','Adet','Fiyat (TL/kg)'];
+  const example = [
+    ['ARC-2026-014','Mil','Çelik',20,'',6,10,''],
+    ['ARC-2026-014','Kare','Paslanmaz',25,'',6,4,''],
+    ['ARC-2026-014','Lama','Bronz',10,50,6,2,''],
+    ['ARC-2026-014','Boru','Kestamid',33.7,3.2,6,3,'']
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([header, ...example]);
+  ws['!cols'] = [{wch:14},{wch:10},{wch:12},{wch:12},{wch:12},{wch:9},{wch:8},{wch:14}];
+  const notes = [
+    ['Sütun','Açıklama'],
+    ['Talep No','Kayıt hangi talebe/projeye ait, serbest metin'],
+    ['Tür','Mil, Kare, Lama veya Boru'],
+    ['Malzeme', Object.values(state.materials).map(m=>m.label).join(', ')],
+    ['Ölçü1 (mm)','Mil: Çap, Kare: Kenar, Lama: Kalınlık, Boru: Dış Çap'],
+    ['Ölçü2 (mm)','Sadece Lama (Genişlik) ve Boru (Et Kalınlığı) için'],
+    ['Boy (m)','Parça uzunluğu'],['Adet','Parça sayısı'],['Fiyat (TL/kg)','Opsiyonel']
+  ];
+  const wsN = XLSX.utils.aoa_to_sheet(notes);
+  wsN['!cols'] = [{wch:14},{wch:70}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Talep Listesi');
+  XLSX.utils.book_append_sheet(wb, wsN, 'Açıklama');
+  XLSX.writeFile(wb, 'metalerp-sablon.xlsx');
+  showToast('Şablon indirildi.');
+});
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  if(state.items.length===0){ showToast('Liste boş.'); return; }
+  const header = ['Talep No','Malzeme','Tür','Ölçü','Boy (m)','Adet','Yoğunluk (g/cm³)','Birim Kg','Toplam Kg','Fiyat (TL/kg)','Tutar (TL)'];
+  const rows = state.items.map(it=>[it.reqName, it.matLabel, typeLabels[it.type], it.dimLabel, it.boy, it.adet, it.density,
+    Number(it.unitKg.toFixed(3)), Number(it.totalKg.toFixed(3)), it.fiyat||'', it.fiyat?Number(it.tutar.toFixed(2)):'']);
+  const totKg = state.items.reduce((s,i)=>s+i.totalKg,0);
+  const totTutar = state.items.reduce((s,i)=>s+(i.tutar||0),0);
+  rows.push([]);
+  rows.push(['','','','','','','','TOPLAM', Number(totKg.toFixed(3)), '', totTutar?Number(totTutar.toFixed(2)):'']);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!cols'] = [{wch:14},{wch:11},{wch:8},{wch:16},{wch:8},{wch:7},{wch:14},{wch:11},{wch:12},{wch:12},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Talep Listesi');
+  XLSX.writeFile(wb, (state.company||'metalerp')+'-talep-listesi.xlsx');
+  showToast('Excel dosyası indirildi.');
+});
+function normalizeType(v){
+  if(!v) return null;
+  const s = v.toString().trim().toLocaleLowerCase('tr-TR');
+  if(s.startsWith('mil')||s.startsWith('yuvarlak')) return 'mil';
+  if(s.startsWith('kare')) return 'kare';
+  if(s.startsWith('lama')) return 'lama';
+  if(s.startsWith('boru')) return 'boru';
+  return null;
+}
+function normalizeMat(v){
+  if(!v) return null;
+  const s = v.toString().trim().toLocaleLowerCase('tr-TR');
+  for(const key in state.materials){
+    if(state.materials[key].label.toLocaleLowerCase('tr-TR')===s || s.startsWith(state.materials[key].label.toLocaleLowerCase('tr-TR'))) return key;
+  }
+  if(s.startsWith('inox')) return normalizeMat('paslanmaz');
+  return null;
+}
+document.getElementById('fileInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt)=>{
+    try{
+      const data = new Uint8Array(evt.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const sheetName = wb.SheetNames.find(n=>n.toLocaleLowerCase('tr-TR').includes('talep')) || wb.SheetNames[0];
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:''});
+      let added=0, skipped=0;
+      rows.forEach((row, idx)=>{
+        if(idx===0 || !row || row.length===0) return;
+        const [reqRaw, turRaw, matRaw, olcu1Raw, olcu2Raw, boyRaw, adetRaw, fiyatRaw] = row;
+        const type = normalizeType(turRaw);
+        const mat = normalizeMat(matRaw);
+        const olcu1 = parseFloat(olcu1Raw);
+        const olcu2 = parseFloat(olcu2Raw);
+        const boy = parseFloat(boyRaw);
+        const adet = parseFloat(adetRaw);
+        const fiyat = parseFloat(fiyatRaw) || 0;
+        if(!type || !mat || !boy || !adet || isNaN(olcu1)){ if(turRaw||matRaw) skipped++; return; }
+        let dims = {};
+        if(type==='mil') dims = {cap:olcu1};
+        else if(type==='kare') dims = {kenar:olcu1};
+        else if(type==='lama') dims = {kalinlik:olcu1, genislik:olcu2||0};
+        else if(type==='boru') dims = {disCap:olcu1, etKalinligi:olcu2||0};
+        addItem({reqName:(reqRaw||'').toString().trim(), type, mat, dims, boy, adet, fiyat, density:state.materials[mat].density});
+        added++;
+      });
+      saveState(); renderAll();
+      showToast(added>0 ? `${added} kayıt içeri aktarıldı${skipped>0?`, ${skipped} satır atlandı`:''}.` : 'Hiçbir satır okunamadı. Şablonu kontrol edin.');
+    }catch(err){
+      showToast('Dosya okunamadı. .xlsx formatında olduğundan emin olun.');
+    }
+    e.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+/* ================= Materials view ================= */
+function renderMaterials(){
+  const tbody = document.getElementById('matRows');
+  tbody.innerHTML = Object.keys(state.materials).map(key=>`
+    <tr>
+      <td><input type="text" data-key="${key}" data-field="label" value="${state.materials[key].label}" style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-family:var(--font);font-size:13px;width:160px;"></td>
+      <td class="num"><input type="number" step="0.001" data-key="${key}" data-field="density" value="${state.materials[key].density}" style="border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:13px;width:100px;text-align:right;"></td>
+      <td><button class="del" data-delmat="${key}" title="Sil">✕</button></td>
+    </tr>`).join('');
+  tbody.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const key = inp.dataset.key, field = inp.dataset.field;
+      if(field==='density'){
+        const v = parseFloat(inp.value);
+        if(v>0) state.materials[key].density = v;
+      } else {
+        state.materials[key].label = inp.value.trim() || state.materials[key].label;
+      }
+      state.items.forEach(it=>{ if(it.mat===key) it.matLabel = state.materials[key].label; });
+      saveState(); renderMatTabs(); populateFilterMat(); showToast('Malzeme güncellendi.');
+    });
+  });
+  tbody.querySelectorAll('[data-delmat]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const key = b.dataset.delmat;
+      const inUse = state.items.some(i=>i.mat===key);
+      if(inUse && !confirm('Bu malzeme kullanılan kayıtlarda mevcut. Yine de silinsin mi?')) return;
+      delete state.materials[key];
+      if(currentMat===key) currentMat = Object.keys(state.materials)[0];
+      saveState(); renderMaterials(); renderMatTabs(); populateFilterMat();
+    });
+  });
+}
+document.getElementById('addMatBtn').addEventListener('click', ()=>{
+  const name = document.getElementById('newMatName').value.trim();
+  const density = parseFloat(document.getElementById('newMatDensity').value);
+  if(!name || !density || density<=0){ showToast('Malzeme adı ve geçerli bir yoğunluk girin.'); return; }
+  const key = name.toLocaleLowerCase('tr-TR').replace(/[^a-z0-9]/gi,'') + '_' + Date.now().toString(36);
+  state.materials[key] = {label:name, density};
+  document.getElementById('newMatName').value = '';
+  document.getElementById('newMatDensity').value = '';
+  saveState(); renderMaterials(); renderMatTabs(); populateFilterMat();
+  showToast('Malzeme eklendi.');
+});
+
+/* ================= Settings ================= */
+document.getElementById('companyName').addEventListener('change', ()=>{
+  state.company = document.getElementById('companyName').value.trim();
+  saveState();
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(confirm('Tüm talep listesi ve özel malzemeler silinecek. Emin misiniz?')){
+    state = {materials: JSON.parse(JSON.stringify(DEFAULT_MATERIALS)), items:[], company:''};
+    document.getElementById('companyName').value = '';
+    saveState(); renderAll();
+    showToast('Tüm veriler sıfırlandı.');
+  }
+});
+
+/* ================= Toast & init ================= */
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function renderAll(){
+  renderMatTabs();
+  renderDimFields();
+  populateFilterMat();
+  renderDashboard();
+  renderList();
+  renderMaterials();
+}
+renderAll();
+
+if(isConfigured(FIREBASE_CONFIG)){
+  if(initFirebase(FIREBASE_CONFIG)){
+    document.getElementById('appRoot').style.display = 'flex';
+    startSync();
+  } else {
+    document.getElementById('setupScreen').style.display = 'block';
+  }
+} else {
+  document.getElementById('setupScreen').style.display = 'block';
+}
+</script>
+</body>
+</html>
