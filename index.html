@@ -420,6 +420,7 @@ function stickyJobRefBanner(j) {
     <span class="small" style="text-transform:uppercase;letter-spacing:.04em;opacity:.85">Şu an girilen referans:</span>
     <div style="font-weight:700;font-size:15px">${esc(jobLabel(j))}</div>
     <div class="small" style="opacity:.9">${esc(c?.name||'')}</div>
+    ${j.drawingRef?`<div class="small" style="opacity:.95;margin-top:2px">📐 Resim No: ${esc(j.drawingRef)}</div>`:''}
   </div>`;
 }
 function drawingRefHtml(ref) {
