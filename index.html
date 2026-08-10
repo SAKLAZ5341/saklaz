@@ -42,6 +42,7 @@
   #syncDot.online { background:#4B8F5E; }
   #syncDot.busy { background:var(--amber); }
   #content { flex:1; overflow-y:auto; }
+  .sticky-ref-banner { position:sticky; top:0; z-index:5; background:var(--red); color:#fff; padding:9px 14px; border-radius:8px; margin-bottom:12px; box-shadow:0 2px 6px rgba(0,0,0,.15); }
   .content-inner { max-width:980px; margin:0 auto; padding:24px 28px 60px; }
 
   /* ---- Alt gezinme (mobil) ---- */
@@ -413,6 +414,14 @@ function money(n) { const v = Number(n)||0; return v.toLocaleString('tr-TR',{sty
 function todayStr() { return new Date().toISOString().slice(0,10); }
 function fmtDate(d) { if(!d) return '-'; try { return new Date(d+'T00:00:00').toLocaleDateString('tr-TR',{day:'2-digit',month:'short',year:'numeric'}); } catch(e){ return d; } }
 function jobLabel(j) { if(!j) return '?'; if(j.projectCode && j.projectName) return j.projectCode+' · '+j.projectName; return j.projectName||j.projectCode||'İsimsiz İş'; }
+function stickyJobRefBanner(j) {
+  const c = companyById(j.companyId);
+  return `<div class="sticky-ref-banner">
+    <span class="small" style="text-transform:uppercase;letter-spacing:.04em;opacity:.85">Şu an girilen referans:</span>
+    <div style="font-weight:700;font-size:15px">${esc(jobLabel(j))}</div>
+    <div class="small" style="opacity:.9">${esc(c?.name||'')}</div>
+  </div>`;
+}
 function drawingRefHtml(ref) {
   if (!ref) return '';
   const isUrl = /^https?:\/\//i.test(ref.trim());
@@ -1017,6 +1026,9 @@ function renderJobDetail() {
   }
 
   else if (tab === 'hammadde') {
+    if (userRole === 'admin' && ui.addingMultiMaterial === j.id) {
+      out += stickyJobRefBanner(j);
+    }
     if (userRole === 'admin') {
       out += ui.addingMultiMaterial === j.id
         ? renderMultiMaterialForm(j.id)
@@ -1030,6 +1042,9 @@ function renderJobDetail() {
   }
 
   else if (tab === 'urun') {
+    if (userRole === 'admin' && ui.addingMovement) {
+      out += stickyJobRefBanner(j);
+    }
     if (userRole === 'admin') {
       out += ui.addingMovement
         ? movementForm(false, j.id, 'gelen')
