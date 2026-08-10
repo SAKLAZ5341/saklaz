@@ -100,6 +100,8 @@
   .muted { color:var(--muted); }
   .small { font-size:11.5px; }
   .filterbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  .searchbar { width:100%; border:1px solid var(--line); background:var(--card); border-radius:8px; padding:10px 12px 10px 34px; font-size:14px; margin-bottom:12px; background-repeat:no-repeat; background-position:11px center; background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="%2387816F" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'); }
+  .searchbar:focus { outline:2px solid var(--blue); outline-offset:-1px; background-color:#fff; }
   .filterbar select { border:1px solid var(--line); border-radius:7px; padding:8px 11px; font-size:13px; background:var(--card); }
   #toast { position:fixed; bottom:70px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:9px 18px; border-radius:20px; font-size:13px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:50; }
   #toast.show { opacity:1; }
@@ -441,8 +443,14 @@ let ui = {
   addingMultiMaterial:null, // job id ya da null
   editingMovementId:null,
   editingReminderId:null,
+  companySearch:'', jobSearch:'', movementSearch:'', reminderSearch:'',
+  reportSearch:'', reportCompanyFilter:'', reportStatusFilter:'', reportQualityFilter:'', reportMaterialFilter:'',
 };
-
+function matchesSearch(query, ...fields) {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  return fields.some(f => String(f||'').toLowerCase().includes(q));
+}
 /* Çoklu hammadde kalemi girişi için geçici durum */
 function blankRow() { return { materialName:'', materialType:'', quality:'', description:'', quantity:'', unit:'', unitPrice:'' }; }
 let materialRows = [blankRow()];
@@ -601,10 +609,12 @@ function renderCompaniesList() {
   out += `<button class="btn-excel admin-only" onclick="triggerImport('companies')">⬆ Excel'den Yükle</button>`;
   out += `<button class="btn-excel admin-only" onclick="downloadTemplate('companies')">📄 Şablon İndir</button>`;
   out += `</div>`;
+  out += `<input class="searchbar" placeholder="Ara: firma adı, yetkili, not…" value="${esc(ui.companySearch)}" oninput="ui.companySearch=this.value;render()">`;
   if (ui.addingCompany) out += companyForm();
+  const filtered = companies.filter(c => matchesSearch(ui.companySearch, c.name, c.contact, c.note));
   out += `<div class="stack" style="margin-top:12px">`;
-  if (companies.length===0 && !ui.addingCompany) out += `<div class="empty">Henüz firma yok.</div>`;
-  companies.forEach(c=>{
+  if (filtered.length===0 && !ui.addingCompany) out += `<div class="empty">${ui.companySearch ? 'Aramayla eşleşen firma yok.' : 'Henüz firma yok.'}</div>`;
+  filtered.forEach(c=>{
     const t = companyTotals(c.id); const jc = jobsForCompany(c.id).length;
     out += `<button class="card row" style="text-align:left;width:100%" onclick="openCompany('${c.id}')">
       <div><div style="font-size:14px;font-weight:500">${esc(c.name)}</div>
@@ -684,7 +694,8 @@ const STATUS = { bekliyor:{label:'Bekliyor',color:'var(--amber)'}, uretimde:{lab
 function statusPill(s) { const st = STATUS[s]||{label:'-',color:'var(--muted)'}; return `<span class="badge-pill" style="background:color-mix(in srgb, ${st.color} 15%, white);color:${st.color}">${st.label}</span>`; }
 
 function renderJobsList() {
-  const filtered = ui.jobsCompanyFilter ? jobs.filter(j=>j.companyId===ui.jobsCompanyFilter) : jobs;
+  let filtered = ui.jobsCompanyFilter ? jobs.filter(j=>j.companyId===ui.jobsCompanyFilter) : jobs;
+  filtered = filtered.filter(j => matchesSearch(ui.jobSearch, j.projectCode, j.projectName, j.drawingRef, j.description, companyById(j.companyId)?.name, STATUS[j.status]?.label));
   const sorted = [...filtered].sort((a,b)=>(b.createdDate||'').localeCompare(a.createdDate||''));
   let out = `<div class="toolbar">`;
   out += `<button class="btn-primary admin-only" ${companies.length===0?'disabled':''} onclick="openMultiJobForm()">+ Yeni İş</button>`;
@@ -692,6 +703,7 @@ function renderJobsList() {
   out += `<button class="btn-excel admin-only" onclick="triggerImport('jobs')">⬆ Excel'den Yükle</button>`;
   out += `<button class="btn-excel admin-only" onclick="downloadTemplate('jobs')">📄 Şablon İndir</button>`;
   out += `</div>`;
+  out += `<input class="searchbar" placeholder="Ara: proje ismi, proje kodu, resim no, açıklama…" value="${esc(ui.jobSearch)}" oninput="ui.jobSearch=this.value;render()">`;
   if (companies.length===0) out += `<div class="small muted" style="margin-bottom:10px">İş eklemeden önce bir firma oluşturun.</div>`;
   if (ui.addingJob) out += renderMultiJobForm();
   if (companies.length>0) {
@@ -699,7 +711,7 @@ function renderJobsList() {
       <option value="">Tüm Firmalar</option>${companies.map(c=>`<option value="${c.id}" ${ui.jobsCompanyFilter===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>`;
   }
   out += `<div class="stack">`;
-  if (sorted.length===0 && !ui.addingJob) out += `<div class="empty">İş bulunamadı.</div>`;
+  if (sorted.length===0 && !ui.addingJob) out += `<div class="empty">${ui.jobSearch || ui.jobsCompanyFilter ? 'Aramayla eşleşen iş yok.' : 'İş bulunamadı.'}</div>`;
   sorted.forEach(j=>{
     out += `<button class="card" style="text-align:left;width:100%" onclick="openJob('${j.id}')">
       <div class="row"><div style="font-size:14px;font-weight:500">${esc(jobLabel(j))}</div>${statusPill(j.status)}</div>
@@ -1143,6 +1155,10 @@ function renderMovementsList() {
   let filtered = [...movements].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   if (ui.movTypeFilter) filtered = filtered.filter(m=>m.type===ui.movTypeFilter);
   if (ui.movCompanyFilter) filtered = filtered.filter(m=>{ const j=jobById(m.jobId); return j && j.companyId===ui.movCompanyFilter; });
+  filtered = filtered.filter(m => {
+    const j = jobById(m.jobId);
+    return matchesSearch(ui.movementSearch, m.itemName, m.materialType, m.quality, m.description, m.note, j?.projectCode, j?.projectName, companyById(j?.companyId)?.name);
+  });
 
   let out = `<div class="toolbar">`;
   out += `<button class="btn-primary admin-only" ${jobs.length===0?'disabled':''} onclick="ui.addingMovementList=true;render()">+ Yeni Hareket</button>`;
@@ -1150,6 +1166,7 @@ function renderMovementsList() {
   out += `<button class="btn-excel admin-only" onclick="triggerImport('movements')">⬆ Excel'den Yükle</button>`;
   out += `<button class="btn-excel admin-only" onclick="downloadTemplate('movements')">📄 Şablon İndir</button>`;
   out += `</div>`;
+  out += `<input class="searchbar" placeholder="Ara: malzeme/ürün, cins, kalite, proje kodu…" value="${esc(ui.movementSearch)}" oninput="ui.movementSearch=this.value;render()">`;
   if (jobs.length===0) out += `<div class="small muted" style="margin-bottom:10px">Hareket eklemeden önce bir iş oluşturun.</div>`;
   if (ui.addingMovementList) out += movementForm(true, null);
 
@@ -1247,6 +1264,10 @@ function renderRemindersList() {
   let filtered = [...reminders].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   if (ui.reminderFilter==='pending') filtered = filtered.filter(r=>!r.done);
   else if (ui.reminderFilter==='done') filtered = filtered.filter(r=>r.done);
+  filtered = filtered.filter(r => {
+    const j = r.jobId ? jobById(r.jobId) : null;
+    return matchesSearch(ui.reminderSearch, r.title, r.note, j?.projectCode, j?.projectName, companyById(j?.companyId)?.name);
+  });
 
   let out = `<div class="toolbar">`;
   out += `<button class="btn-primary admin-only" onclick="ui.addingReminderList=true;render()">+ Yeni Hatırlatıcı</button>`;
@@ -1254,6 +1275,7 @@ function renderRemindersList() {
   out += `<button class="btn-excel admin-only" onclick="triggerImport('reminders')">⬆ Excel'den Yükle</button>`;
   out += `<button class="btn-excel admin-only" onclick="downloadTemplate('reminders')">📄 Şablon İndir</button>`;
   out += `</div>`;
+  out += `<input class="searchbar" placeholder="Ara: başlık, not, proje kodu…" value="${esc(ui.reminderSearch)}" oninput="ui.reminderSearch=this.value;render()">`;
   if (ui.addingReminderList) out += reminderForm(null);
   out += `<div class="chip-row">
     <span class="chip ${ui.reminderFilter==='pending'?'active':''}" onclick="ui.reminderFilter='pending';render()">Bekleyen</span>
@@ -1555,10 +1577,47 @@ function qcPills(j, size) {
   }).join('');
 }
 function renderReportsList() {
-  const sorted = [...jobs].sort((a,b)=>(b.createdDate||'').localeCompare(a.createdDate||''));
+  let filtered = [...jobs];
+  if (ui.reportCompanyFilter) filtered = filtered.filter(j => j.companyId === ui.reportCompanyFilter);
+  if (ui.reportStatusFilter) filtered = filtered.filter(j => j.status === ui.reportStatusFilter);
+  if (ui.reportQualityFilter) {
+    if (ui.reportQualityFilter === 'belirsiz') filtered = filtered.filter(j => !j.qualityStatus);
+    else filtered = filtered.filter(j => j.qualityStatus === ui.reportQualityFilter);
+  }
+  if (ui.reportMaterialFilter) {
+    filtered = filtered.filter(j => {
+      const has = movements.some(m => m.jobId === j.id && m.type === 'giden');
+      return ui.reportMaterialFilter === 'gonderildi' ? has : !has;
+    });
+  }
+  filtered = filtered.filter(j => matchesSearch(ui.reportSearch, j.projectCode, j.projectName, j.drawingRef, j.description, companyById(j.companyId)?.name));
+  const sorted = filtered.sort((a,b)=>(b.createdDate||'').localeCompare(a.createdDate||''));
+
   let out = `<div class="small muted" style="margin-bottom:14px">Her iş için gönderilen hammaddelerin tam durumu ve kalite kontrolü. Detaya girmek için işe tıklayın.</div>`;
+  out += `<input class="searchbar" placeholder="Ara: proje ismi, proje kodu, resim no, açıklama…" value="${esc(ui.reportSearch)}" oninput="ui.reportSearch=this.value;render()">`;
+  out += `<div class="filterbar">
+    <select onchange="ui.reportCompanyFilter=this.value;render()">
+      <option value="">Tüm Firmalar</option>${companies.map(c=>`<option value="${c.id}" ${ui.reportCompanyFilter===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}
+    </select>
+    <select onchange="ui.reportStatusFilter=this.value;render()">
+      <option value="">Tüm Durumlar</option>${Object.entries(STATUS).map(([k,s])=>`<option value="${k}" ${ui.reportStatusFilter===k?'selected':''}>${s.label}</option>`).join('')}
+    </select>
+    <select onchange="ui.reportQualityFilter=this.value;render()">
+      <option value="">Tüm Kalite Durumları</option>
+      <option value="belirsiz" ${ui.reportQualityFilter==='belirsiz'?'selected':''}>Belirsiz</option>
+      ${Object.entries(QC_STATUS).map(([k,q])=>`<option value="${k}" ${ui.reportQualityFilter===k?'selected':''}>${q.label}</option>`).join('')}
+    </select>
+    <select onchange="ui.reportMaterialFilter=this.value;render()">
+      <option value="">Hammadde: Tümü</option>
+      <option value="gonderildi" ${ui.reportMaterialFilter==='gonderildi'?'selected':''}>Gönderildi</option>
+      <option value="gonderilmedi" ${ui.reportMaterialFilter==='gonderilmedi'?'selected':''}>Gönderilmedi</option>
+    </select>
+  </div>`;
+  const anyFilter = ui.reportSearch || ui.reportCompanyFilter || ui.reportStatusFilter || ui.reportQualityFilter || ui.reportMaterialFilter;
+  if (anyFilter) out += `<button class="btn-link" style="margin-bottom:10px" onclick="ui.reportSearch='';ui.reportCompanyFilter='';ui.reportStatusFilter='';ui.reportQualityFilter='';ui.reportMaterialFilter='';render()">Filtreleri Temizle</button>`;
+
   out += `<div class="stack">`;
-  if (sorted.length === 0) out += `<div class="empty">Henüz iş yok.</div>`;
+  if (sorted.length === 0) out += `<div class="empty">${anyFilter ? 'Filtreyle eşleşen iş yok.' : 'Henüz iş yok.'}</div>`;
   sorted.forEach(j => {
     const c = companyById(j.companyId);
     const gidenList = movements.filter(m => m.jobId === j.id && m.type === 'giden').sort((a,b)=>(b.date||'').localeCompare(a.date||''));
