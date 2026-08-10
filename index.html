@@ -165,7 +165,8 @@
     </div>
   </aside>
   <div id="mainCol">
-    <div id="topbar">
+    <div id="topbar" style="display:flex;align-items:center;gap:12px;justify-content:flex-start">
+      <button id="topbarBack" onclick="goBack()" style="display:none;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:18px;flex-shrink:0;cursor:pointer">‹</button>
       <div class="titlewrap">
         <div class="eyebrow"><span id="syncDotTop"></span>Fason Takip <span id="roleBadge"></span></div>
         <div class="title" id="topbarTitle">Özet</div>
@@ -180,7 +181,7 @@
 
 <script>
 /* ---------- ÖNEMLİ: Yönetici e-postanızı buraya yazın ---------- */
-const ADMIN_EMAIL = "fatihsak.lyoness@gmail.com"; // <-- Bu satırı kendi giriş yaptığınız e-posta ile değiştirin!
+const ADMIN_EMAIL = "SIZIN_EMAIL_ADRESINIZ@ornek.com"; // <-- Bu satırı kendi giriş yaptığınız e-posta ile değiştirin!
 
 /* ---------- Depolama (Firebase Firestore ile senkron) ---------- */
 let companies = [];
@@ -351,6 +352,7 @@ async function enterApp() {
     ? '<span class="role-badge" style="background:#E4EEF4;color:var(--blue-dark)">Yönetici</span>'
     : '<span class="role-badge" style="background:#F1EEE6;color:var(--muted)">Görüntüleyici</span>';
   document.getElementById('content').innerHTML = '<div class="content-inner pt"><div class="empty">Veriler yükleniyor…</div></div>';
+  try { history.replaceState(historySnapshot(), ''); } catch (e) {}
   if (userRole === 'admin') await migrateLegacyDataIfNeeded();
   subscribeToData();
 }
@@ -427,7 +429,7 @@ function toast(msg) { const t=document.getElementById('toast'); t.textContent=ms
 
 /* ---------- Uygulama durumu ---------- */
 let ui = {
-  tab: 'dashboard', companyDetail: null, jobDetail: null,
+  tab: 'dashboard', companyDetail: null, jobDetail: null, jobDetailTab: 'genel',
   addingCompany:false, editingCompany:false,
   addingJob:false, jobsCompanyFilter:'',
   editingJob:false, addingMovement:false, addingReminderInJob:false,
@@ -447,13 +449,39 @@ let materialRows = [blankRow()];
 let materialFormDate = todayStr();
 let materialFormNote = '';
 
+/* ---------- Geri tuşu / tarayıcı geçmişi entegrasyonu ---------- */
+let suppressHistoryPush = false;
+function historySnapshot() {
+  return { tab: ui.tab, companyDetail: ui.companyDetail, jobDetail: ui.jobDetail, jobDetailTab: ui.jobDetailTab };
+}
+function pushHistory() {
+  if (suppressHistoryPush) return;
+  try { history.pushState(historySnapshot(), ''); } catch (e) {}
+}
+window.addEventListener('popstate', (e) => {
+  suppressHistoryPush = true;
+  const s = e.state;
+  ui.tab = s ? s.tab : 'dashboard';
+  ui.companyDetail = s ? s.companyDetail : null;
+  ui.jobDetail = s ? s.jobDetail : null;
+  ui.jobDetailTab = (s && s.jobDetailTab) || 'genel';
+  ui.addingCompany=false; ui.editingCompany=false; ui.addingJob=false; ui.editingJob=false;
+  ui.addingMovement=false; ui.addingReminderInJob=false; ui.addingMovementList=false; ui.addingReminderList=false;
+  ui.confirmDeleteCompany=false; ui.confirmDeleteJob=false; ui.confirmRow=null; ui.addingMultiMaterial=null;
+  ui.editingMovementId=null; ui.editingReminderId=null;
+  render();
+  suppressHistoryPush = false;
+});
+function goBack() { history.back(); }
+
 function setTab(t) {
-  ui.tab = t; ui.companyDetail = null; ui.jobDetail = null;
+  ui.tab = t; ui.companyDetail = null; ui.jobDetail = null; ui.jobDetailTab = 'genel';
   ui.addingCompany=false; ui.editingCompany=false; ui.addingJob=false; ui.editingJob=false;
   ui.addingMovement=false; ui.addingReminderInJob=false; ui.addingMovementList=false; ui.addingReminderList=false;
   ui.confirmDeleteCompany=false; ui.confirmDeleteJob=false; ui.confirmRow=null; ui.addingMultiMaterial=null;
   ui.editingMovementId=null; ui.editingReminderId=null;
   materialRows=[blankRow()]; materialFormDate=todayStr(); materialFormNote='';
+  pushHistory();
   render();
 }
 
@@ -461,6 +489,9 @@ function setTab(t) {
 function render() {
   const titles = { dashboard:'Özet', companies: ui.companyDetail ? 'Firma Detayı':'Firmalar', jobs: ui.jobDetail ? 'İş Detayı':'İşler', movements:'Hareketler', reminders:'Hatırlatıcılar', reports:'Raporlar', users:'Kullanıcılar' };
   document.getElementById('topbarTitle').textContent = titles[ui.tab] || 'Fason Takip';
+  const showBack = !!(ui.companyDetail || ui.jobDetail || ui.tab !== 'dashboard');
+  const backBtn = document.getElementById('topbarBack');
+  if (backBtn) backBtn.style.display = showBack ? 'flex' : 'none';
 
   let html = '';
   if (ui.tab === 'dashboard') html = renderDashboard();
@@ -551,13 +582,15 @@ function renderDashboard() {
   out += `</div>`;
   return out;
 }
-function openCompany(id) { ui.tab='companies'; ui.companyDetail=id; render(); }
-function openJob(id) {
-  ui.tab='jobs'; ui.jobDetail=id; ui.addingMovement=false; ui.addingMultiMaterial=null;
+function openCompany(id) { ui.tab='companies'; ui.companyDetail=id; pushHistory(); render(); }
+function openJob(id, tab) {
+  ui.tab='jobs'; ui.jobDetail=id; ui.jobDetailTab = tab || 'genel'; ui.addingMovement=false; ui.addingMultiMaterial=null;
   ui.addingReminderInJob=false; ui.editingJob=false; ui.confirmDeleteJob=false;
   materialRows=[blankRow()]; materialFormDate=todayStr(); materialFormNote='';
+  pushHistory();
   render();
 }
+function setJobDetailTab(tab) { ui.jobDetailTab = tab; pushHistory(); render(); }
 
 /* ---------- FİRMALAR ---------- */
 function renderCompaniesList() {
@@ -603,7 +636,7 @@ function cancelCompanyForm() { ui.addingCompany=false; ui.editingCompany=false; 
 function renderCompanyDetail() {
   const c = companyById(ui.companyDetail); if (!c) return '<div class="px16 empty">Firma bulunamadı.</div>';
   const t = companyTotals(c.id); const jList = jobsForCompany(c.id);
-  let out = `<button class="link-back" onclick="ui.companyDetail=null;render()">‹ Firmalar</button><div class="px16">`;
+  let out = `<button class="link-back" onclick="goBack()">‹ Firmalar</button><div class="px16">`;
   out += ui.editingCompany ? companyForm(c) : `<div class="card row" style="align-items:flex-start">
     <div><div style="font-weight:600">${esc(c.name)}</div>
     ${c.contact?`<div class="small muted" style="margin-top:2px">${esc(c.contact)}</div>`:''}
@@ -718,66 +751,100 @@ function renderJobDetail() {
   const giden = mList.filter(m=>m.type==='giden'), gelen = mList.filter(m=>m.type==='gelen');
   const gidenTutar = giden.reduce((s,m)=>s+(Number(m.quantity)||0)*(Number(m.unitPrice)||0),0);
   const gelenTutar = gelen.reduce((s,m)=>s+(Number(m.quantity)||0)*(Number(m.unitPrice)||0),0);
+  const tab = ui.jobDetailTab || 'genel';
 
-  let out = `<button class="link-back" onclick="ui.jobDetail=null;render()">‹ İşler</button><div class="px16">`;
-  out += ui.editingJob ? jobForm(j) : `<div class="card">
+  let out = `<button class="link-back" onclick="goBack()">‹ İşler</button><div class="px16">`;
+
+  out += `<div class="card" style="margin-bottom:14px">
     <div class="row" style="align-items:flex-start">
-      <div><div style="font-weight:600;font-size:14px">${esc(jobLabel(j))}</div>
-      <div class="small muted" style="margin-top:2px">${esc(c?.name||'')}${j.quantity?` · ${j.quantity} adet`:''}${j.fee?` · ${money(j.fee)}`:''}</div>
-      ${j.drawingRef?`<div class="small" style="color:var(--blue-dark);margin-top:6px">📐 ${esc(j.drawingRef)}</div>`:''}
-      ${j.description?`<div class="small muted" style="margin-top:4px">${esc(j.description)}</div>`:''}</div>
-      <button class="btn-link admin-only" onclick="ui.editingJob=true;render()">✎</button></div>
-    <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-      ${userRole==='admin' ? Object.entries(STATUS).map(([k,s])=>`<button class="badge-pill" style="border:none;background:${j.status===k?s.color:'color-mix(in srgb, '+s.color+' 12%, white)'};color:${j.status===k?'#fff':s.color}" onclick="updateJobStatus('${j.id}','${k}')">${s.label}</button>`).join('') : statusPill(j.status)}
-    </div></div>`;
-
-  out += `<div class="grid3" style="margin-top:12px">
-    <div class="stat"><div class="lbl">Giden Hammadde</div><div class="val" style="color:var(--amber)">${money(gidenTutar)}</div></div>
-    <div class="stat"><div class="lbl">Gelen Fason</div><div class="val" style="color:var(--green)">${money(gelenTutar)}</div></div>
-    <div class="stat"><div class="lbl">İş Ücreti</div><div class="val" style="color:var(--blue)">${money(j.fee)}</div></div>
+      <div><div style="font-weight:600;font-size:15px">${esc(jobLabel(j))}</div>
+      <div class="small muted" style="margin-top:2px">${esc(c?.name||'')}${j.quantity?` · ${j.quantity} adet`:''}${j.fee?` · ${money(j.fee)}`:''}</div></div>
+      ${statusPill(j.status)}
+    </div>
   </div>`;
 
-  out += `<div class="card" style="margin-top:12px">
-    <div class="small muted" style="margin-bottom:8px;font-weight:600">Kalite Kontrolü</div>
-    <div style="display:flex;gap:6px">${qcPills(j)}</div>
-  </div>`;
+  const JOB_TABS = [
+    {id:'genel', label:'Genel'},
+    {id:'hammadde', label:`Hammadde (${giden.length})`},
+    {id:'urun', label:`Ürün / Fason (${gelen.length})`},
+    {id:'kalite', label:'Kalite'},
+    {id:'hatirlatici', label:`Hatırlatıcı (${rList.length})`},
+  ];
+  out += `<div class="chip-row">` + JOB_TABS.map(t => `<span class="chip ${tab===t.id?'active':''}" onclick="setJobDetailTab('${t.id}')">${t.label}</span>`).join('') + `</div>`;
 
-  if (userRole === 'admin') {
-    out += `<div style="margin-top:12px">`;
-    if (ui.addingMultiMaterial === j.id) {
-      out += renderMultiMaterialForm(j.id);
-    } else if (ui.addingMovement) {
-      out += movementForm(false, j.id, 'gelen');
-    } else {
-      out += `<div class="grid2">
-        <button class="btn-primary" onclick="openMultiMaterialForm('${j.id}')">+ Hammadde Gönder</button>
-        <button class="btn-secondary" style="width:100%" onclick="ui.addingMovement=true;render()">+ Gelen Ürün / Fason</button>
+  if (tab === 'genel') {
+    out += ui.editingJob ? jobForm(j) : `<div class="card">
+      <div class="row" style="align-items:flex-start">
+        <div>
+        ${j.drawingRef?`<div class="small" style="color:var(--blue-dark)">📐 ${esc(j.drawingRef)}</div>`:''}
+        ${j.description?`<div class="small muted" style="margin-top:4px">${esc(j.description)}</div>`:'<div class="small muted">Açıklama girilmemiş.</div>'}
+        </div>
+        <button class="btn-link admin-only" onclick="ui.editingJob=true;render()">✎</button></div>
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+        ${userRole==='admin' ? Object.entries(STATUS).map(([k,s])=>`<button class="badge-pill" style="border:none;background:${j.status===k?s.color:'color-mix(in srgb, '+s.color+' 12%, white)'};color:${j.status===k?'#fff':s.color}" onclick="updateJobStatus('${j.id}','${k}')">${s.label}</button>`).join('') : ''}
+      </div></div>`;
+
+    out += `<div class="grid3" style="margin-top:12px">
+      <div class="stat"><div class="lbl">Giden Hammadde</div><div class="val" style="color:var(--amber)">${money(gidenTutar)}</div></div>
+      <div class="stat"><div class="lbl">Gelen Fason</div><div class="val" style="color:var(--green)">${money(gelenTutar)}</div></div>
+      <div class="stat"><div class="lbl">İş Ücreti</div><div class="val" style="color:var(--blue)">${money(j.fee)}</div></div>
+    </div>`;
+
+    out += `<div style="margin:16px 0">`;
+    if (!ui.confirmDeleteJob) out += `<button class="btn-link admin-only" style="color:var(--red)" onclick="ui.confirmDeleteJob=true;render()">🗑 İşi Sil</button>`;
+    else out += `<div class="small" style="color:var(--red)">İş ve tüm hareketleri silinecek. Emin misiniz?</div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn-danger" onclick="deleteJob('${j.id}')">Evet, Sil</button>
+        <button class="btn-secondary" onclick="ui.confirmDeleteJob=false;render()">Vazgeç</button>
       </div>`;
-    }
     out += `</div>`;
   }
 
-  out += `<div class="sect-label" style="padding:0">Hatırlatıcılar (${rList.length})</div><div class="stack">`;
-  rList.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(r=> out += reminderRow(r));
-  if (userRole === 'admin') out += ui.addingReminderInJob ? reminderForm(j.id) : `<button class="btn-link admin-only" onclick="ui.addingReminderInJob=true;render()">+ Hatırlatıcı Ekle</button>`;
-  out += `</div>`;
+  else if (tab === 'hammadde') {
+    if (userRole === 'admin') {
+      out += ui.addingMultiMaterial === j.id
+        ? renderMultiMaterialForm(j.id)
+        : `<button class="btn-primary" style="margin-bottom:12px" onclick="openMultiMaterialForm('${j.id}')">+ Hammadde Gönder</button>`;
+    }
+    out += `<div class="stat" style="margin-bottom:12px"><div class="lbl">Toplam Giden Hammadde</div><div class="val" style="color:var(--amber)">${money(gidenTutar)}</div></div>`;
+    out += `<div class="stack">`;
+    if (giden.length===0) out += `<div class="empty">Bu işe henüz hammadde gönderilmedi.</div>`;
+    giden.forEach(m => out += movementRow(m));
+    out += `</div>`;
+  }
 
-  out += `<div class="sect-label" style="padding:0">Hareketler (${mList.length})</div><div class="stack" style="padding-bottom:16px">`;
-  if (mList.length===0) out += `<div class="small muted">Henüz hareket yok.</div>`;
-  mList.forEach(m => out += movementRow(m));
-  out += `</div>`;
+  else if (tab === 'urun') {
+    if (userRole === 'admin') {
+      out += ui.addingMovement
+        ? movementForm(false, j.id, 'gelen')
+        : `<button class="btn-primary" style="margin-bottom:12px" onclick="ui.addingMovement=true;render()">+ Gelen Ürün / Fason Ekle</button>`;
+    }
+    out += `<div class="stat" style="margin-bottom:12px"><div class="lbl">Toplam Gelen Fason</div><div class="val" style="color:var(--green)">${money(gelenTutar)}</div></div>`;
+    out += `<div class="stack">`;
+    if (gelen.length===0) out += `<div class="empty">Bu işten henüz ürün/fason bedeli gelmedi.</div>`;
+    gelen.forEach(m => out += movementRow(m));
+    out += `</div>`;
+  }
 
-  out += `<div style="margin:16px 0">`;
-  if (!ui.confirmDeleteJob) out += `<button class="btn-link admin-only" style="color:var(--red)" onclick="ui.confirmDeleteJob=true;render()">🗑 İşi Sil</button>`;
-  else out += `<div class="small" style="color:var(--red)">İş ve tüm hareketleri silinecek. Emin misiniz?</div>
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <button class="btn-danger" onclick="deleteJob('${j.id}')">Evet, Sil</button>
-      <button class="btn-secondary" onclick="ui.confirmDeleteJob=false;render()">Vazgeç</button>
+  else if (tab === 'kalite') {
+    out += `<div class="card">
+      <div class="small muted" style="margin-bottom:8px;font-weight:600">Kalite Kontrolü Durumu</div>
+      <div style="display:flex;gap:6px">${qcPills(j)}</div>
     </div>`;
-  out += `</div></div>`;
+  }
+
+  else if (tab === 'hatirlatici') {
+    out += `<div class="stack">`;
+    rList.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(r=> out += reminderRow(r));
+    if (rList.length===0) out += `<div class="empty">Bu işe bağlı hatırlatıcı yok.</div>`;
+    if (userRole === 'admin') out += ui.addingReminderInJob ? reminderForm(j.id) : `<button class="btn-link admin-only" style="margin-top:8px" onclick="ui.addingReminderInJob=true;render()">+ Hatırlatıcı Ekle</button>`;
+    out += `</div>`;
+  }
+
+  out += `</div>`;
   return out;
 }
-function updateJobStatus(id, status) { jobById(id).status = status; persist(); render(); }
+function updateJobStatus(id, status) { jobById(id).status = status; persist(); render(); toast('Durum güncellendi: ' + STATUS[status].label); }
 function deleteJob(id) {
   movements = movements.filter(m=>m.jobId!==id); reminders = reminders.filter(r=>r.jobId!==id);
   jobs = jobs.filter(j=>j.id!==id); persist(); ui.jobDetail=null; ui.confirmDeleteJob=false; render(); toast('İş silindi');
@@ -1394,24 +1461,38 @@ function qcPills(j, size) {
 }
 function renderReportsList() {
   const sorted = [...jobs].sort((a,b)=>(b.createdDate||'').localeCompare(a.createdDate||''));
-  let out = `<div class="small muted" style="margin-bottom:14px">Her iş için hammadde gönderim durumu (hareketlerden otomatik hesaplanır) ve kalite kontrolü durumu.</div>`;
+  let out = `<div class="small muted" style="margin-bottom:14px">Her iş için gönderilen hammaddelerin tam durumu ve kalite kontrolü. Detaya girmek için işe tıklayın.</div>`;
   out += `<div class="stack">`;
   if (sorted.length === 0) out += `<div class="empty">Henüz iş yok.</div>`;
   sorted.forEach(j => {
     const c = companyById(j.companyId);
-    const hasGiden = movements.some(m => m.jobId === j.id && m.type === 'giden');
+    const gidenList = movements.filter(m => m.jobId === j.id && m.type === 'giden').sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const hasGiden = gidenList.length > 0;
     out += `<div class="card">
-      <div class="row" style="align-items:flex-start">
-        <div>
-          <div style="font-size:14px;font-weight:500">${esc(jobLabel(j))}</div>
-          <div class="small muted" style="margin-top:2px">${esc(c?.name||'Bilinmeyen firma')}</div>
+      <button style="all:unset;cursor:pointer;display:block;width:100%" onclick="openJob('${j.id}','hammadde')">
+        <div class="row" style="align-items:flex-start">
+          <div>
+            <div style="font-size:14px;font-weight:500">${esc(jobLabel(j))}</div>
+            <div class="small muted" style="margin-top:2px">${esc(c?.name||'Bilinmeyen firma')}</div>
+          </div>
+          ${statusPill(j.status)}
         </div>
-        ${statusPill(j.status)}
-      </div>
+      </button>
       <div class="small" style="margin-top:10px;padding:9px;border-radius:8px;text-align:center;font-weight:600;background:${hasGiden?'#EAF3EC':'#F7ECE9'};color:${hasGiden?'var(--green)':'var(--red)'}">
-        ${hasGiden ? '✓ Hammadde Gönderildi' : '✕ Hammadde Gönderilmedi'}
-      </div>
-      <div class="small muted" style="margin-top:10px;margin-bottom:4px">Kalite Kontrolü</div>
+        ${hasGiden ? `✓ Hammadde Gönderildi (${gidenList.length} kalem)` : '✕ Hammadde Gönderilmedi'}
+      </div>`;
+    if (hasGiden) {
+      out += `<div class="stack" style="margin-top:8px;gap:6px">`;
+      gidenList.slice(0, 4).forEach(m => {
+        out += `<div class="small" style="display:flex;justify-content:space-between;padding:6px 2px;border-top:1px solid var(--line-soft)">
+          <span>${esc(m.itemName)}${m.quality?` · ${esc(m.quality)}`:''}</span>
+          <span class="muted">${m.quantity} ${esc(m.unit)} · ${fmtDate(m.date)}</span>
+        </div>`;
+      });
+      if (gidenList.length > 4) out += `<div class="small muted" style="text-align:center;padding-top:2px">+ ${gidenList.length - 4} kalem daha — detay için tıklayın</div>`;
+      out += `</div>`;
+    }
+    out += `<div class="small muted" style="margin-top:10px;margin-bottom:4px">Kalite Kontrolü</div>
       <div style="display:flex;gap:6px">${qcPills(j)}</div>
     </div>`;
   });
